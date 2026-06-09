@@ -1,0 +1,15 @@
+gymnasium
+httpx
+matplotlib
+mujoco
+numpy
+openai
+opencv-python
+pillow
+PySide6
+scikit-image
+scikit-learn
+scipy
+stable-baselines3
+torch
+transformers

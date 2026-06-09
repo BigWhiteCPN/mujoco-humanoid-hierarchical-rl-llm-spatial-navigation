@@ -1,0 +1,32 @@
+{
+  "figure_size": [
+    12.0,
+    7.2
+  ],
+  "axes": {
+    "scene": {
+      "left": 0.0032,
+      "bottom": 0.0032,
+      "width": 0.5548,
+      "height": 0.8568
+    },
+    "camera": {
+      "left": 0.5688,
+      "bottom": 0.5552,
+      "width": 0.429,
+      "height": 0.4419
+    },
+    "map": {
+      "left": 0.5645,
+      "bottom": 0.0014,
+      "width": 0.4333,
+      "height": 0.5447
+    },
+    "log": {
+      "left": 0.0032,
+      "bottom": 0.8672,
+      "width": 0.5602,
+      "height": 0.1281
+    }
+  }
+}
