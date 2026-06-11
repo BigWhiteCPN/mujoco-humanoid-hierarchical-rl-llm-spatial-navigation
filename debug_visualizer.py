@@ -9,17 +9,16 @@ class DebugVisualizer:
         self.half_world = self.world_size_m / 2.0
 
         self.last_draw_time = 0.0
-        self.min_interval = 0.04  # 限制最高 10 帧/秒，防止卡顿
+        self.min_interval = 0.04  # Cap debug redraws at about 25 FPS.
 
         plt.ion()
         self.fig, self.ax = plt.subplots(figsize=(8, 8))
         plt.show(block=False)
 
-        # 1:1 对齐参考文件：创建空白概率网格（初始化为0.5未知区域）
         initial_prob_grid = np.ones((int(self.world_size_m * self.resolution), 
                                      int(self.world_size_m * self.resolution))) * 0.5
                                      
-        # 【核心修正】：严格使用参考代码中的 extent 参数和默认绘图方向
+        # Match the environment's world-frame extent so map cells align with robot pose.
         self.im = self.ax.imshow(initial_prob_grid, cmap='gray_r',
                                  vmin=0, vmax=1,
                                  extent=[-self.half_world, self.half_world, -self.half_world, self.half_world])
@@ -28,9 +27,8 @@ class DebugVisualizer:
         self.ax.set_xlabel("X (meters)")
         self.ax.set_ylabel("Y (meters)")
 
-        # 1:1 对齐参考代码的 Patch 定义
         self.robot_patch = self.ax.add_patch(plt.Circle((0, 0), 0.2, color='blue', zorder=5))
-        self.robot_arrow = None  # 动态生成箭头，防闪退
+        self.robot_arrow = None
         self.goal_patch, = self.ax.plot([], [], '*', color='red', markersize=15, zorder=4)
         self.path_patch, = self.ax.plot([], [], '-', color='cyan', linewidth=2, zorder=3)
         
@@ -50,7 +48,6 @@ class DebugVisualizer:
                title_extra='',
                force_update=False):
 
-        # 跳帧限制
         current_time = time.time()
         if not force_update and (current_time - self.last_draw_time < self.min_interval):
             return  
@@ -59,7 +56,7 @@ class DebugVisualizer:
         if not plt.fignum_exists(self.fig.number):
             return
 
-        # 1. 严格使用环境类自带的 _log_odds_to_prob 来转概率，没有任何花哨的操作
+        # Prefer the environment conversion to keep debug colors consistent.
         if global_grid_map is not None and hasattr(global_grid_map, 'grid'):
             if hasattr(global_grid_map, '_log_odds_to_prob'):
                 prob_map = global_grid_map._log_odds_to_prob(global_grid_map.grid)
@@ -67,7 +64,6 @@ class DebugVisualizer:
                 prob_map = 1.0 - 1.0 / (1.0 + np.exp(global_grid_map.grid))
             self.im.set_data(prob_map)
 
-        # 2. 更新机器人（严格对齐环境的 X, Y）
         if robot_pos is not None:
             self.robot_patch.center = (robot_pos[0], robot_pos[1])
             if robot_yaw is not None:
@@ -78,7 +74,6 @@ class DebugVisualizer:
                 self.robot_arrow = plt.Arrow(robot_pos[0], robot_pos[1], arrow_dx, arrow_dy, width=0.2, color='blue', zorder=5)
                 self.ax.add_patch(self.robot_arrow)
 
-        # 3. 目标点与路径
         if goal_pos is not None:
             self.goal_patch.set_data([goal_pos[0]], [goal_pos[1]])
 
@@ -87,7 +82,6 @@ class DebugVisualizer:
         else:
             self.path_patch.set_data([], [])
 
-        # 4. 其他图层更新
         if landmark_positions:
             for lm_id, pos in landmark_positions.items():
                 if lm_id not in self.landmark_patches:

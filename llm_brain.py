@@ -1,4 +1,3 @@
-# --- START OF FILE llm_brain.py ---
 import os
 import json
 import time
@@ -9,7 +8,6 @@ from queue import Queue
 import numpy as np          
 from openai import OpenAI
 
-# 🌟 引入心智模拟器
 from skills import MentalSimulator
 
 class RobotAgent:
@@ -19,7 +17,7 @@ class RobotAgent:
         self.explore_skill = explore_skill
         self.topo_map = topo_map
 
-        # 🌟 初始化具身心智预演器 (给 LLM 一个强大的空间“想象力”)
+        # Use the same planner as navigation for a cheap feasibility check before running SAC.
         self.mental_simulator = MentalSimulator(self.nav_skill.env, robot_radius_m=0.4)
 
         self.client = OpenAI(
@@ -52,7 +50,7 @@ class RobotAgent:
                 "function": {
                     "name": "explore_environment",
                     "description": (
-                        "前往地图中未知区域探索。如果人类要你寻找某个具体地点，必须填入 target_place。"
+                        "前往地图中未知区域探索。如果用户要寻找某个具体地点，必须填入 target_place。"
                         "探索完成后，系统会自动按 target_place 列表的顺序依次前往每个目标。"
                         "因此调用此工具后，不需要再额外调用 navigate_to_place。"
                     ),
@@ -71,7 +69,7 @@ class RobotAgent:
                             "direction_hint": {
                                 "type": "string",
                                 "description": (
-                                    "基于你的常识推理，猜测目标可能在哪个方位。"
+                                    "根据目标类型和未探索区域，给出优先探索方位。"
                                     "可选值：north, south, east, west, northeast, northwest, southeast, southwest。"
                                     "如果无法推断，留空即可。"
                                 )
@@ -115,7 +113,7 @@ class RobotAgent:
         return text[:max_chars - 3] + "..."
 
     def _execute_tool_call(self, func_name, args):
-        """统一执行工具调用，返回工具结果字符串"""
+        """Execute one tool call and return the text passed back to the model."""
         if getattr(self.nav_skill.env, "_shutdown_requested", False):
             return "任务已被用户中断。"
 
@@ -130,7 +128,7 @@ class RobotAgent:
             else:
                 direction_hint = None
 
-            print(f"[身体 🦾] 收到大脑指令：开始定向寻找目标序列 {targets}，方位偏好: {direction_hint}")
+            print(f"[执行] 开始定向探索: targets={targets}, direction_hint={direction_hint}")
 
             journey_log = self.explore_skill.execute(
                 max_rounds=20,
@@ -145,7 +143,7 @@ class RobotAgent:
                     coords = self.memory.get_location_by_meaning(t)
                     if coords:
                         landmark_id = self.memory.get_feature_id_by_meaning(t) if hasattr(self.memory, "get_feature_id_by_meaning") else None
-                        print(f"[身体 🦾] 按顺序前往: {t} ({coords[0]:.1f}, {coords[1]:.1f})...")
+                        print(f"[导航] 按顺序前往: {t} ({coords[0]:.1f}, {coords[1]:.1f})")
                         success, dist = self.nav_skill.go_to(
                             coords[0],
                             coords[1],
@@ -154,29 +152,26 @@ class RobotAgent:
                             track_landmark_id=landmark_id,
                         )
                         if success:
-                            final_action_summary += f"\n✅ 已按顺序成功到达【{t}】。"
+                            final_action_summary += f"\n已按顺序到达【{t}】。"
                         else:
-                            final_action_summary += f"\n⚠️ 尝试前往【{t}】但未能完全到达（距离{dist:.1f}米）。"
+                            final_action_summary += f"\n尝试前往【{t}】但未完全到达（距离 {dist:.1f} 米）。"
                     else:
                         missing_targets.append(t)
 
                 if missing_targets:
-                    final_action_summary += f"\n❌ 未能找到以下地点：{missing_targets}"
+                    final_action_summary += f"\n未找到以下地点：{missing_targets}"
 
             tool_result = (
-                f"【底层身体传回的探索日记】:\n{journey_log}\n"
+                f"【探索日志】:\n{journey_log}\n"
                 f"\n【自动导航结果】:{final_action_summary}\n"
-                f"\n⚠️ 注意：系统已按照 target_place 列表的顺序自动完成了所有导航，"
+                f"\n注意：系统已按照 target_place 列表的顺序完成导航，"
                 f"你无需再调用 navigate_to_place。请直接用自然语言向用户汇报结果。"
             )
             return tool_result
 
-        # ==========================================
-        # 🌟 动作 2：直接导航（加入 A* 心智预演拦截机制）
-        # ==========================================
         elif func_name == "navigate_to_place":
             place_name = args.get('place_name')
-            print(f"[大脑 🧠] 正在脑海中预演前往【{place_name}】的路径...")
+            print(f"[预演] 检查前往【{place_name}】的路径")
 
             coords = self.memory.get_location_by_meaning(place_name)
             if not coords:
@@ -185,20 +180,20 @@ class RobotAgent:
             
             robot_pos = self.nav_skill.env.data.xpos[self.nav_skill.env.robot_base_body_id][:2]
             
-            # 🌟 核心：启动心智模拟器进行预演！
             sim_result = self.mental_simulator.simulate_path(
                 start_pos=robot_pos, 
                 goal_pos=np.array(coords)
             )
             
-            # 🌟 如果预演发现路被堵死，直接拦截！不执行底层强化学习 SAC
             if not sim_result["feasible"]:
-                print(f"[内心独白 💭] 哎呀，拓扑预演失败：{sim_result['reason']}")
+                print(f"[预演] 路径不可达: {sim_result['reason']}")
                 return (f"【路径预演失败】：物理空间阻断，无法前往 {place_name}。原因：{sim_result['reason']}。"
-                        f"请使用自然语言向人类解释路被堵死了，不要让机器傻站着。")
+                        f"请向用户说明当前地图上没有可达路径。")
             
-            # 🌟 预演成功，放行，执行真实物理导航
-            print(f"[内心独白 💭] 预演成功！路程约 {sim_result['path_length_m']:.1f}米，预计 {sim_result['estimated_steps']} 步。开始注入底层物理执行...")
+            print(
+                f"[预演] 路径可达: length={sim_result['path_length_m']:.1f}m, "
+                f"estimated_steps={sim_result['estimated_steps']}"
+            )
             
             success, dist = self.nav_skill.go_to(
                 coords[0],
@@ -208,11 +203,11 @@ class RobotAgent:
             )
             
             if success:
-                # 把预演得到的数据返回给 LLM，让 LLM 的回答显得有距离感知
-                return (f"导航任务完美完成！【预演辅助数据：本次路径长 {sim_result['path_length_m']:.1f}米，大约行驶了 {sim_result['estimated_steps']}步】。"
-                        f"目前位置：{place_name} 前方。请在回复时，像人类一样顺便提及这段路程的距离和步数感觉。")
+                return (f"导航任务完成。【路径估计：{sim_result['path_length_m']:.1f} 米，"
+                        f"约 {sim_result['estimated_steps']} 步】。目前位置：{place_name} 前方。"
+                        f"回复时可说明估计路程和步数。")
             else:
-                return f"导航失败，虽然脑海中预演通畅，但底层物理引擎执行时遭遇动态意外（距离目标{dist:.1f}米）。"
+                return f"导航未到达目标。路径预演可达，但执行结束时距离目标 {dist:.1f} 米。"
 
         elif func_name == "recall_spatial_memory":
             spatial_report = self.memory.get_spatial_report(
@@ -221,12 +216,12 @@ class RobotAgent:
             topo_report = self.topo_map.get_explored_summary() if self.topo_map else "拓扑记忆不可用。"
             revisit_info = ""
             if self.topo_map:
-                hotspots = self.topo_map.get_revisit_candidates(min_visits=2)
-                if hotspots:
-                    revisit_info = "\n\n🔥 多次访问的热点位置（可能是关键路口）：\n"
-                    for i, node in enumerate(hotspots):
+                repeated_nodes = self.topo_map.get_revisit_candidates(min_visits=2)
+                if repeated_nodes:
+                    revisit_info = "\n\n多次访问的位置（可能是关键路口）：\n"
+                    for i, node in enumerate(repeated_nodes):
                         pos = node['pos']
-                        revisit_info += (f"  热点{i+1}: ({pos[0]:.1f}, {pos[1]:.1f})，"
+                        revisit_info += (f"  节点{i+1}: ({pos[0]:.1f}, {pos[1]:.1f})，"
                                          f"访问 {node['visit_count']} 次\n")
             return f"【空间记忆报告】\n{spatial_report}\n\n【拓扑探索记录】\n{topo_report}{revisit_info}"
 
@@ -272,7 +267,7 @@ class RobotAgent:
         next_idle_time = time.perf_counter()
         while thread.is_alive():
             if getattr(env, "_shutdown_requested", False):
-                self._log_ui("系统: 已取消等待大脑响应。")
+                self._log_ui("系统: 已取消等待模型响应。")
                 raise RuntimeError("任务已被用户中断")
             now = time.time()
             perf_now = time.perf_counter()
@@ -309,7 +304,7 @@ class RobotAgent:
 
     @staticmethod
     def _idle_step_env(env):
-        """Keep the robot physically alive while the LLM is thinking."""
+        """Advance idle locomotion and map bookkeeping while waiting for the model."""
         if hasattr(env, "locomotion_controller"):
             env.locomotion_controller.step(0.0, 0.0, 0.0)
         if hasattr(env, "robot_base_body_id") and hasattr(env, "grid_map"):
@@ -318,38 +313,38 @@ class RobotAgent:
                 env.grid_map.update_visited_footprint(robot_pos)
 
     def chat_and_execute(self, user_command):
-        print(f"\n[人类 🗣️] 指令: {user_command}")
+        print(f"\n[用户] 指令: {user_command}")
         self._log_ui(f"用户: {user_command}")
 
         robot_pos = self.nav_skill.env.data.xpos[self.nav_skill.env.robot_base_body_id][:2]
         spatial_report = self.memory.get_spatial_report(robot_pos)
         unexplored_hint = self._get_unexplored_directions_hint()
 
-        # 拓扑记忆摘要
+        # Give the model a compact summary instead of the full node list.
         topo_hint = ""
         if self.topo_map and self.topo_map.nodes:
             n_nodes = len(self.topo_map.nodes)
-            hotspots = self.topo_map.get_revisit_candidates(min_visits=2)
+            repeated_nodes = self.topo_map.get_revisit_candidates(min_visits=2)
             topo_hint = f"【拓扑记忆】：已探索 {n_nodes} 个不同位置"
-            if hotspots:
-                topo_hint += f"，其中 {len(hotspots)} 个位置被多次访问（可能是关键路口）。"
+            if repeated_nodes:
+                topo_hint += f"，其中 {len(repeated_nodes)} 个位置被多次访问（可能是关键路口）。"
             else:
                 topo_hint += "。"
 
         system_prompt = (
-            "你是一个具备高级人类空间逻辑思维的具身探索机器人。\n"
+            "你是一个室内移动机器人控制助手，负责把用户指令转成探索或导航动作。\n"
             f"【当前空间感知状态】:\n{spatial_report}\n\n"
             f"【未探索区域分析】:\n{unexplored_hint}\n\n"
             f"{topo_hint}\n\n"
             "【行为逻辑】：\n"
-            "1. 理解多步指令：如果人类要求'先去A再去B'，检查A和B是否都在感知状态中。\n"
+            "1. 理解多步指令：如果用户要求'先去A再去B'，检查A和B是否都在感知状态中。\n"
             "2. 混合决策：如果有地点不在记忆里，调用 explore_environment 寻找，按用户要求的访问顺序排列。\n"
-            "3. ⚠️ explore_environment 会在探索完成后自动按顺序依次导航。调用 explore_environment 后，绝对不要再调用 navigate_to_place。\n"
+            "3. explore_environment 会在探索完成后自动按顺序依次导航。调用 explore_environment 后，不要再调用 navigate_to_place。\n"
             "4. 只有在用户仅要求去一个**已知地点**时，才使用 navigate_to_place。\n"
-            "5. ⚠️ 调用 explore_environment 时，请根据常识和【未探索区域分析】，给出 direction_hint。\n"
+            "5. 调用 explore_environment 时，请根据目标类型和【未探索区域分析】，给出 direction_hint。\n"
             "6. 动作串联：当工具返回执行成功的日记后，结合日记内容用第一人称自然汇报。\n"
-            "7. ⚠️ 绝不允许在任务完成前轻易放弃！\n"
-            "8. 当 navigate_to_place 返回了路程米数和步数时，要在回答里表现出来，增加你的真实具身感！"
+            "7. 如果工具返回了明确失败原因，直接说明原因；否则继续用可用工具完成任务。\n"
+            "8. 当 navigate_to_place 返回路程米数和步数时，在回答里简要说明。"
         )
 
         messages =[
@@ -357,12 +352,12 @@ class RobotAgent:
             {"role": "user", "content": user_command}
         ]
 
-        print("[大脑 🧠] 正在进行空间推理与认知推演...")
-        self._log_ui("思考提示: 读取空间记忆、未探索区域和拓扑热点，判断是否需要调用导航/探索工具。")
+        print("[LLM] 读取空间状态并选择工具...")
+        self._log_ui("思考提示: 读取空间记忆、未探索区域和重复访问节点，判断是否需要调用导航/探索工具。")
 
         max_tool_rounds = 5
         for tool_round in range(max_tool_rounds):
-            self._log_ui(f"大脑: 第{tool_round + 1}轮空间推理中...")
+            self._log_ui(f"LLM: 第{tool_round + 1}轮工具选择中...")
             response = self._wait_for_llm_with_rendering(messages, use_tools=True)
             response_msg = response.choices[0].message
             messages.append(response_msg)
@@ -379,7 +374,7 @@ class RobotAgent:
                 tool_call_id = tool_call.id
                 args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
 
-                print(f"[大脑 🧠] 第{tool_round + 1}轮发起技能调用: {func_name}({args})")
+                print(f"[LLM] 第{tool_round + 1}轮工具调用: {func_name}({args})")
                 self._log_ui(f"工具调用: {func_name}({self._shorten_for_ui(args, max_chars=120)})")
 
                 tool_result = self._execute_tool_call(func_name, args)
@@ -391,10 +386,10 @@ class RobotAgent:
                     "tool_call_id": tool_call_id
                 })
 
-        print("[大脑 🧠] 认知推演结束，生成最终意识流汇报...")
+        print("[LLM] 工具轮次结束，生成最终回复...")
         if getattr(self.nav_skill.env, "_shutdown_requested", False):
             return "任务已被用户中断。"
-        self._log_ui("大脑: 工具轮次结束，生成最终汇报...")
+        self._log_ui("LLM: 工具轮次结束，生成最终汇报...")
         final_response = self._wait_for_llm_with_rendering(messages, use_tools=False)
         answer = final_response.choices[0].message.content
         self._log_ui(f"结果: {self._shorten_for_ui(answer)}")

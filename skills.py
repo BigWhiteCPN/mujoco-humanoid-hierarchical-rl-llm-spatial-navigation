@@ -1,4 +1,3 @@
-# --- START OF FILE skills.py ---
 import numpy as np
 import mujoco
 import threading
@@ -14,10 +13,9 @@ import gymnasium as gym
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from sklearn.cluster import DBSCAN
 
-# ==============================================================================
-# 🌟 核心：为了加载新策略所需的自定义网络结构 (CNN + GRU + ReLU对齐)
-# ==============================================================================
 class SequenceFusionExtractor(BaseFeaturesExtractor):
+    """Feature extractor used by the saved SAC checkpoint."""
+
     def __init__(self, observation_space: gym.spaces.Dict,
                  state_feature_dim=9,
                  history_length=15,
@@ -25,7 +23,6 @@ class SequenceFusionExtractor(BaseFeaturesExtractor):
         features_dim = 256
         super().__init__(observation_space, features_dim)
 
-        # 1. 栅格地图处理 CNN
         n_input_channels = observation_space['grid_map'].shape[0] 
         
         self.cnn_body = nn.Sequential(
@@ -49,14 +46,12 @@ class SequenceFusionExtractor(BaseFeaturesExtractor):
             nn.ReLU()
         )
 
-        # 2. 状态序列处理 GRU
         self.state_sub_dim = state_feature_dim
         self.seq_len = history_length
         
         self.state_embedding = nn.Linear(state_feature_dim, d_model)
         self.gru = nn.GRU(input_size=d_model, hidden_size=d_model, num_layers=2, batch_first=True)
         
-        # 3. 融合层
         self.fusion_layer = nn.Sequential(
             nn.Linear(128 + d_model, features_dim),
             nn.LayerNorm(features_dim),
@@ -64,7 +59,7 @@ class SequenceFusionExtractor(BaseFeaturesExtractor):
         )
 
     def forward(self, observations):
-        # 必须转成 float 并除以 255.0，与训练环境严格对齐
+        # Match the normalization used when training the policy.
         grid_map = observations['grid_map'].float() / 255.0 
         map_feat = self.map_cnn(grid_map)
         
@@ -80,18 +75,15 @@ class SequenceFusionExtractor(BaseFeaturesExtractor):
         output = self.fusion_layer(combined)
         return output
 
-# ==============================================================================
-# 心智模拟器 (Mental Simulator)
-# ==============================================================================
 class MentalSimulator:
-    """心智模拟器：复用环境路径规划器，在执行物理导航前预演路径"""
+    """Fast path feasibility check using the environment planner."""
     def __init__(self, env, robot_radius_m=0.35):
         self.env = env
         self.robot_radius_m = robot_radius_m
 
     def simulate_path(self, start_pos, goal_pos):
         if not hasattr(self.env, 'grid_map') or not hasattr(self.env, 'path_planner'):
-            return {"feasible": False, "reason": "我还未建立地图空间感知"}
+            return {"feasible": False, "reason": "地图或路径规划器不可用"}
 
         path = self.env.path_planner.find_path(np.asarray(start_pos), np.asarray(goal_pos))
         if path is None or len(path) < 2:
@@ -104,13 +96,10 @@ class MentalSimulator:
             "feasible": True,
             "path_length_m": path_length_m,
             "estimated_steps": int(path_length_m / 0.5),
-            "reason": "路径畅通"
+            "reason": "路径可达"
         }
 
 
-# ==============================================================================
-# 技能模块：Perception & Navigation
-# ==============================================================================
 class PerceptionSkill:
     def __init__(self, env, memory):
         self.env = env
@@ -211,9 +200,9 @@ class PerceptionSkill:
 class NavigationSkill:
     def __init__(self, env, sac_model_path):
         self.env = env
-        print(f"[导航] 准备加载包含 GRU 记忆的全新 SAC 模型: {sac_model_path}")
+        print(f"[导航] 加载 SAC 模型: {sac_model_path}")
         
-        # 挂载自定义模型架构配置，解决找不到类的问题
+        # Register the checkpoint's custom feature extractor for SB3 deserialization.
         device = "cuda" if torch.cuda.is_available() else "cpu"
         custom_objects = {
             "SequenceFusionExtractor": SequenceFusionExtractor,
@@ -228,10 +217,10 @@ class NavigationSkill:
             device=device, 
             custom_objects=custom_objects
         )
-        print("[导航] SAC 模型加载完成！")
+        print("[导航] SAC 模型加载完成")
 
     def _validate_goal(self, target_x, target_y):
-        """检查目标点是否在墙里，如果是则挪到最近的空地"""
+        """Move targets out of occupied cells when the map already marks them blocked."""
         grid_map = self.env.grid_map
         prob_grid = 1.0 - 1.0 / (1.0 + np.exp(grid_map.grid))
         c = int((target_x + grid_map.world_origin_offset_m[0]) * grid_map.resolution)
@@ -240,7 +229,7 @@ class NavigationSkill:
         c = np.clip(c, 0, grid_map.num_cells_world - 1)
         if prob_grid[r, c] < 0.65:
             return target_x, target_y
-        # 目标在障碍物里，搜索最近的空地
+        # Search an expanding ring for the nearest free cell.
         for radius in range(1, 15):
             for dr in range(-radius, radius + 1):
                 for dc in range(-radius, radius + 1):
@@ -315,7 +304,8 @@ class NavigationSkill:
         last_tracked_goal_update = 0.0
         last_tracked_log_time = 0.0
 
-        # 如果路径规划用了兜底（沿朝向走1.5m），说明地图不够，不盲目导航
+        # The fallback path means A* did not find a useful route yet; do not run
+        # a long SAC rollout against an unreliable target.
         if getattr(self.env, '_path_fallback', False):
             with lock_context:
                 robot_pos = self.env.data.xpos[self.env.robot_base_body_id][:2].copy()
@@ -323,7 +313,7 @@ class NavigationSkill:
             print(f"  -> 路径规划失败（地图未充分探索），跳过导航 dist={dist:.2f}")
             return False, dist
 
-        # 撞墙脱困：记录历史位置，检测卡住
+        # Detect low displacement over a sliding window and run a short recovery action.
         pos_history = []
         stuck_threshold = 0.12  # 窗口内移动不到 0.12m 才判定为真正卡住，减少慢速转弯误判。
         stuck_window = 75
@@ -369,7 +359,7 @@ class NavigationSkill:
                 stop_early = step_callback()
                 callback_ms = (time.perf_counter() - cb_t0) * 1000.0
                 if stop_early:
-                    print("  -> 触发新发现！立即中断当前盲目导航！")
+                    print("  -> step_callback 请求提前结束当前导航")
                     with lock_context:
                         robot_pos = self.env.data.xpos[self.env.robot_base_body_id][:2].copy()
                     return True, np.linalg.norm(robot_pos - goal)
@@ -445,7 +435,6 @@ class NavigationSkill:
                     force=pos_delta > 0.18,
                 )
 
-            # 撞墙脱困逻辑
             pos_history.append(robot_pos.copy())
             if len(pos_history) > stuck_window:
                 pos_history.pop(0)
@@ -453,14 +442,14 @@ class NavigationSkill:
             if len(pos_history) == stuck_window:
                 moved = np.linalg.norm(pos_history[-1] - pos_history[0])
                 if moved >= stuck_threshold:
-                    stuck_count = 0  # 正常移动，重置脱困计数
+                    stuck_count = 0
                 else:
                     stuck_count += 1
                     if stuck_count > max_stuck_recoveries:
                         print(f"  -> 脱困失败 {max_stuck_recoveries} 次，放弃导航, dist={dist:.2f}")
                         return False, dist
 
-                    print(f"  -> 检测到卡住 (移动{moved:.2f}m)，温和脱困 #{stuck_count}...")
+                    print(f"  -> 检测到卡住 (移动 {moved:.2f}m)，执行恢复动作 #{stuck_count}")
                     recovery_action = np.zeros_like(action, dtype=np.float32)
                     recovery_action[0] = -0.12
                     if recovery_action.shape[0] >= 3:
@@ -482,9 +471,6 @@ class NavigationSkill:
         return False, dist
 
 
-# ==============================================================================
-# 技能模块：Frontier 主动探索 (🌟 融入主动推断与香农熵的全新数学版本)
-# ==============================================================================
 class FrontierExplorationSkill:
     def __init__(self, env, nav_skill, percept_skill, topo_map=None):
         self.env = env
@@ -612,11 +598,11 @@ class FrontierExplorationSkill:
         return clusters
 
     def _frontier_key(self, point, cell_size=2.5):
-        """将坐标量化为网格 cell key，用于 O(1) 回访检测"""
+        """Quantize a world position for O(1) revisit checks."""
         return (int(round(float(point[0]) / cell_size)), int(round(float(point[1]) / cell_size)))
 
     def _clear_frontier_history(self):
-        """清空已访问/失败前沿记录（列表 + 哈希集合）"""
+        """Clear frontier history in both list and set forms."""
         self.visited_frontiers.clear()
         self.failed_frontiers.clear()
         self._visited_frontier_keys.clear()
@@ -782,7 +768,7 @@ class FrontierExplorationSkill:
             target = np.clip(robot_pos + np.array(offset), -9.0, 9.0)
             self.nav_skill.go_to(target[0], target[1], max_steps=100, success_dist=0.8)
             self.percept_skill.scan_and_remember()
-        # 拓扑地图：记录起始位置
+        # Seed topological memory at the start pose.
         if self.topo_map is not None:
             robot_pos_now = self.env.data.xpos[self.env.robot_base_body_id][:2].copy()
             detected = self._visual_sweep_and_remember(turns=4)
@@ -805,7 +791,7 @@ class FrontierExplorationSkill:
         return None
 
     def _compute_entropy_map(self):
-        """计算贝叶斯概率地图的香农熵分布 (Shannon Entropy)，带缓存"""
+        """Compute cached Shannon entropy for the occupancy probability map."""
         if not hasattr(self.env, 'grid_map'): return None
         grid = self.env.grid_map.grid
         # 地图会在探索过程中原地更新；用轻量级统计量做脏检测，避免复用旧熵图。
@@ -830,7 +816,7 @@ class FrontierExplorationSkill:
         return np.sum(entropy_map[r_min:r_max, c_min:c_max]) / (grid_map.resolution ** 2)
 
     def _estimate_path_length(self, start_pos, goal_pos):
-        # 量化到 0.5m 网格做缓存 key，避免浮点精度问题
+        # Quantize to 0.5 m bins so nearby float coordinates reuse the same path query.
         key = (round(float(start_pos[0]) * 2), round(float(start_pos[1]) * 2),
                round(float(goal_pos[0]) * 2), round(float(goal_pos[1]) * 2))
         cached = self._path_cache.get(key)
@@ -961,7 +947,8 @@ class FrontierExplorationSkill:
         self._path_cache.clear()
         consecutive_failures = 0
         direction_bias = self._parse_direction_hint(direction_hint)
-        if direction_bias is not None: journey_log.append(f"LLM 常识提示：注入优先向 {direction_hint} 探索的先验信念。")
+        if direction_bias is not None:
+            journey_log.append(f"按 direction_hint={direction_hint} 优先评估对应方向的前沿。")
 
         self.trajectory_history.clear()
         if not self._has_initial_scanned:
@@ -1022,7 +1009,7 @@ class FrontierExplorationSkill:
                             visual_scan=True
                         )
                     if all(self.percept_skill.memory.get_location_by_meaning(t) for t in missing_targets):
-                        journey_log.append(f"✅ 回访复扫后找齐目标 {missing_targets}。")
+                        journey_log.append(f"回访复扫后找齐目标 {missing_targets}。")
                         break
 
             frontier_points = self._get_frontiers()
@@ -1037,7 +1024,7 @@ class FrontierExplorationSkill:
                         self._clear_frontier_history()
                         if not[t for t in targets if not self.percept_skill.memory.get_location_by_meaning(t)]: break
                         continue
-                journey_log.append("地图已完全探索，无更多可达区域。"); break
+                journey_log.append("地图已完成当前可达区域探索。"); break
 
             local_radius_m = 4.0
             local_done, local_stats = self._estimate_local_exploration_status(
@@ -1116,17 +1103,17 @@ class FrontierExplorationSkill:
                         self.nav_skill.go_to(rt[0], rt[1], max_steps=600, success_dist=1.5, step_callback=dynamic_frontier_update, callback_freq=40)
                         self._clear_frontier_history()
                         continue
-                journey_log.append("剩余未知区域暂时无法到达..."); self._clear_frontier_history()
+                journey_log.append("剩余未知区域暂时不可达。"); self._clear_frontier_history()
                 continue
 
             raw_target = target_cluster['center']
             nav_target = target_cluster.get('nav_candidate', self._compute_nav_target(raw_target))
             journey_log.append(
-                f"第{round_idx + 1}轮：基于自由能最小化决策 → "
+                f"第{round_idx + 1}轮：选择 frontier "
                 f"目标=({nav_target[0]:.1f}, {nav_target[1]:.1f})，"
-                f"预期消除香农熵(Epistemic)={target_cluster['epistemic_val']:.1f}，"
+                f"信息增益={target_cluster['epistemic_val']:.1f}，"
                 f"路径={target_cluster['path_length']:.1f}m，绕路倍率={target_cluster['detour_ratio']:.1f}x，"
-                f"物理与先验消耗(Pragmatic)={target_cluster['prag_cost']:.1f}，最终EFE评分={best_score:.1f}"
+                f"代价={target_cluster['prag_cost']:.1f}，评分={best_score:.1f}"
             )
 
             success, dist = self.nav_skill.go_to(
@@ -1141,20 +1128,19 @@ class FrontierExplorationSkill:
             if not success:
                 consecutive_failures += 1; self.failed_frontiers.append(raw_target.copy())
                 self._failed_frontier_keys.add(self._frontier_key(raw_target, cell_size=1.2))
-                journey_log.append(f"  → 导航受阻 (dist={dist:.1f})，记录拓扑失败节点。")
-                # 连续失败时清空已访问边界，强制重新评估（碰撞后机器人位置已变）
+                journey_log.append(f"  -> 导航受阻 (dist={dist:.1f})，记录失败 frontier。")
+                # After repeated failures, allow previously skipped frontiers to be reconsidered.
                 if consecutive_failures >= 2:
-                    journey_log.append(f"  ⚠️ 连续 {consecutive_failures} 次失败，强制重新评估边界。")
+                    journey_log.append(f"  连续 {consecutive_failures} 次失败，重新评估 frontier。")
                     self.visited_frontiers.clear()
                     self._visited_frontier_keys.clear()
-                    # 重新扫描感知
                     self.percept_skill.scan_and_remember()
             else:
-                consecutive_failures = 0; journey_log.append(f"  → 成功到达认知目标点。")
+                consecutive_failures = 0; journey_log.append(f"  -> 已到达 frontier 目标点。")
 
             detected_landmarks = self._visual_sweep_and_remember(turns=4) if target_place else self.percept_skill.scan_and_remember()
 
-            # 拓扑地图：记录当前位置
+            # Record the current place after navigation and visual scan.
             if self.topo_map is not None:
                 robot_pos_now = self.env.data.xpos[self.env.robot_base_body_id][:2].copy()
                 lm_ids = [d['id'] for d in detected_landmarks] if detected_landmarks else []
@@ -1165,12 +1151,12 @@ class FrontierExplorationSkill:
                     visual_scan=bool(target_place)
                 )
                 if not is_new and node['visit_count'] >= 3:
-                    journey_log.append(f"  🔁 识别到重复访问！这里已经是第 {node['visit_count']} 次来了。")
+                    journey_log.append(f"  重复访问节点，累计 {node['visit_count']} 次。")
 
             current_keys = set(self.percept_skill.memory.memory_db.keys())
             if current_keys != initial_mem_keys:
                 for new_key in (current_keys - initial_mem_keys):
-                    journey_log.append(f"  ★ 发现新地点：{self.percept_skill.memory.feature_meaning.get(new_key, new_key)}")
+                    journey_log.append(f"  发现新地点：{self.percept_skill.memory.feature_meaning.get(new_key, new_key)}")
                 initial_mem_keys = current_keys
             progress_callback = getattr(self.env, "_qt_progress_callback", None)
             if progress_callback is not None:
@@ -1179,7 +1165,7 @@ class FrontierExplorationSkill:
             if target_place:
                 targets_list = [target_place] if isinstance(target_place, str) else target_place
                 if all(self.percept_skill.memory.get_location_by_meaning(t) for t in targets_list):
-                    journey_log.append(f"✅ 目标集 {target_place} 已全部找齐！"); break
+                    journey_log.append(f"目标集 {target_place} 已全部找齐。"); break
 
         self.env.current_frontiers =[]
         return "\n".join(journey_log)

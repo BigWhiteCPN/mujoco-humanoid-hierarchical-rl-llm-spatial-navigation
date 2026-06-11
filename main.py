@@ -1,4 +1,3 @@
-# --- START OF FILE main.py ---
 import os
 import sys
 import time
@@ -146,7 +145,7 @@ def main():
         "/home/chen/code/IsaacLabExtensionTemplate/sac_lidar_logs_random/sac_lidar_interrupted_good3_0.91.zip",
     )
 
-    print("=== 初始化具身智能体系统 (完美渲染同步 + 无穿墙 Bug 版) ===")
+    print("=== 启动 MuJoCo 导航演示 ===")
     print("[DEBUG] CPU 数值库线程限制为 1，降低 Qt/MuJoCo/策略推理抢占抖动")
 
     env_kwargs = {
@@ -181,22 +180,22 @@ def main():
     agent = RobotAgent(nav_skill, memory, explore_skill, topo_map=topo_map)
 
     print("\n=======================================================")
-    print("✅ 智能体启动完毕！随机迷宫与Lidar避障系统已完美贴合。")
-    print("💡 指令示例：")
-    print("   '去会议室看看'  → 触发 Frontier 探索")
-    print("   '你发现了什么'  → 查看记忆")
-    print("   '回忆一下'      → 查看拓扑空间记忆（去过哪里、走了几次）")
-    print("   '加载记忆'      → 加载上次的地图和拓扑记忆")
-    print("   '保存记忆'      → 持久化到文件")
-    print("   '重置地图'      → 新迷宫 + 清空记忆")
-    print("   '退出'          → 保存并退出")
+    print("系统已启动：随机迷宫、Lidar 栅格地图和导航策略已初始化。")
+    print("示例指令：")
+    print("   '去会议室看看'  - 触发 Frontier 探索")
+    print("   '你发现了什么'  - 查看记忆")
+    print("   '回忆一下'      - 查看拓扑空间记忆（去过哪里、走了几次）")
+    print("   '加载记忆'      - 加载上次的地图和拓扑记忆")
+    print("   '保存记忆'      - 持久化到文件")
+    print("   '重置地图'      - 新迷宫 + 清空记忆")
+    print("   '退出'          - 保存并退出")
     print("=======================================================\n")
     dashboard_log(env, "系统: 智能体启动完毕，等待用户指令。")
 
     session_id = time.strftime("%Y%m%d_%H%M%S")
     last_session_path = None
 
-    # 自动查找最近一次 session
+    # 供“加载记忆”使用：默认选择最近一次保存的 session。
     if os.path.exists(memory.save_dir):
         sessions = sorted([d for d in os.listdir(memory.save_dir) if d.startswith("session_")])
         if sessions:
@@ -221,7 +220,7 @@ def main():
         if hasattr(env, 'close'):
             env.close()
         plt.close('all')
-        print("[系统] 再见！")
+        print("[系统] 已退出")
 
     def handle_command(user_cmd):
         nonlocal session_id, last_session_path
@@ -260,15 +259,15 @@ def main():
             robot_pos = env.data.xpos[env.robot_base_body_id][:2]
             spatial_report = memory.get_spatial_report(robot_pos)
             topo_report = topo_map.get_explored_summary()
-            print(f"\n[空间记忆 🧠]\n{spatial_report}")
-            print(f"\n[拓扑记忆 🗺️]\n{topo_report}")
+            print(f"\n[空间记忆]\n{spatial_report}")
+            print(f"\n[拓扑记忆]\n{topo_report}")
             dashboard_log(env, f"结果: {spatial_report} {topo_report}")
             hotspots = topo_map.get_revisit_candidates(min_visits=2)
             if hotspots:
-                print("\n🔥 热点位置（多次访问）：")
+                print("\n[重复访问位置]")
                 for i, node in enumerate(hotspots):
                     pos = node['pos']
-                    print(f"  热点{i+1}: ({pos[0]:.1f}, {pos[1]:.1f})，访问 {node['visit_count']} 次")
+                    print(f"  节点{i+1}: ({pos[0]:.1f}, {pos[1]:.1f})，访问 {node['visit_count']} 次")
             return False
 
         if command in ['重置地图', 'reset map']:
@@ -289,7 +288,7 @@ def main():
             return False
 
         reply = agent.chat_and_execute(command)
-        print(f"[机器人 🤖] {reply}")
+        print(f"[机器人] {reply}")
         dashboard_log(env, f"机器人: {reply}")
         return False
 
@@ -303,7 +302,7 @@ def main():
 
     while True:
         try:
-            user_cmd = input_with_idle("\n[人类 🗣️] 请输入指令: ", env, realtime_runner, command_window)
+            user_cmd = input_with_idle("\n[用户] 请输入指令: ", env, realtime_runner, command_window)
             if handle_command(user_cmd):
                 shutdown()
                 break

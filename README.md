@@ -2,6 +2,12 @@
 
 MuJoCo-based embodied agent demo with frontier exploration, SAC navigation, lidar mapping, RGB-D landmark detection, topological memory, and a Qt dashboard.
 
+## Demo
+
+[![Demo video preview](assets/demo-preview.png)](assets/demo.mp4)
+
+[Watch the 2:45 demo video](assets/demo.mp4) ([WebM fallback](assets/demo.webm)).
+
 ## Notes
 
 This folder is intended to be used inside the original IsaacLabExtensionTemplate workspace. Runtime assets are not committed:

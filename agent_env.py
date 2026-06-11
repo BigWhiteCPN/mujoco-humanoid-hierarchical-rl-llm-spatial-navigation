@@ -1,4 +1,3 @@
-# --- START OF FILE agent_env.py ---
 import numpy as np
 import mujoco
 import mujoco.viewer
@@ -21,22 +20,17 @@ try:
 except ImportError:
     SegFormerSemanticSegmenter = None
 
-# ==============================================================================
-# 🌟 修复 1：将导入环境改为你最新训练使用的 random_map 版本！
-# 这样机器人的物理阻尼、PD参数、轨迹前瞻将与小脑训练时 100% 对齐。
-# ==============================================================================
+# Prefer the random-map training environment so dynamics and observation format
+# match the policy checkpoint used by this demo.
 sys.path.append("/home/iansten/code/IsaacLabExtensionTemplate/scripts/visual_train/")
 try:
     from robot_visual_env_random_map import RobotVisualEnv, GlobalGridMap
 except ImportError:
-    # 兼容老用户名路径
+    # Local fallback path on this workstation.
     sys.path.append("/home/chen/code/IsaacLabExtensionTemplate/scripts/visual_train/")
     from robot_visual_env_random_map import RobotVisualEnv, GlobalGridMap
 
 
-# ==============================================================================
-# 1. 迷宫生成器 (20米/8x8 配置) - 直接内嵌在此，无需修改外部文件
-# ==============================================================================
 class MazeGridGenerator:
     def __init__(self, world_size=20.0, grid_dim=8, remove_wall_prob=0.25):
         self.world_size = world_size
@@ -98,9 +92,6 @@ class MazeGridGenerator:
                         })
         return walls
 
-# ==============================================================================
-# 2. 智能体环境 (完美突破父类限制，独占 20x20 世界生成权)
-# ==============================================================================
 class AgentVisualEnv(RobotVisualEnv):
     def __init__(self, *args, **kwargs):
         enable_mujoco_viewer = bool(kwargs.pop("enable_mujoco_viewer", False))
@@ -109,7 +100,7 @@ class AgentVisualEnv(RobotVisualEnv):
         if hasattr(self, 'grid_map') and self.grid_map.world_size_m < 20.0:
             self.grid_map = GlobalGridMap(world_size_m=20.0, local_map_size_m=4.0, resolution=6)
 
-        # 保持 180 ray 采样；性能通过缓存 ray 方向和批量栅格更新优化。
+        # Keep the policy's 180-ray lidar layout; cache ray directions to cut per-frame cost.
         self.lidar_num_rays = 180
         self.lidar_angles = np.linspace(-self.lidar_fov / 2, self.lidar_fov / 2, self.lidar_num_rays)
         self._lidar_local_rays_cache = np.column_stack([
@@ -131,9 +122,7 @@ class AgentVisualEnv(RobotVisualEnv):
         self._perception_max_skip_interval = 0.18
         self.runtime_fast_step = True
             
-        # ==============================================================================
-        # 强行欺骗 stable_baselines3，把观测空间声明回模型训练时的 2x24x24 uint8
-        # ==============================================================================
+        # Stable-Baselines loads the checkpoint against the training observation shape.
         self.obs_num_cells_local = 24
         half_local = self.obs_num_cells_local / 2.0
         local_x, local_y = np.meshgrid(np.arange(self.obs_num_cells_local), np.arange(self.obs_num_cells_local))
@@ -446,20 +435,19 @@ class AgentVisualEnv(RobotVisualEnv):
         self.path_update_counter = 0
         self._update_path()
 
-        # 如果路径规划失败，沿机器人当前朝向走一小段作为安全路径
-        # 绝对不用直线穿墙路径！
+        # If A* cannot find a path yet, use a short forward segment instead of
+        # sending the policy a straight-line target through unknown space.
         if self.current_path is None:
             robot_pos = self.data.xpos[self.robot_base_body_id][:2].copy()
             mat = self.data.xmat[self.robot_base_body_id].reshape(3, 3)
             yaw = np.arctan2(mat[1, 0], mat[0, 0])
-            # 沿当前朝向走 1.5 米，生成短安全路径
             forward = np.array([np.cos(yaw), np.sin(yaw)])
             end_pos = robot_pos + forward * 1.5
             end_pos = np.clip(end_pos, -9.0, 9.0)
             self.current_path = np.array([robot_pos, end_pos])
             self.current_waypoint_index = 1
             self.current_target_waypoint = end_pos
-            self._path_fallback = True  # 标记为兜底路径
+            self._path_fallback = True
         else:
             self._path_fallback = False
 
@@ -469,8 +457,8 @@ class AgentVisualEnv(RobotVisualEnv):
         if self.dist_to_goal_start < 0.1: self.dist_to_goal_start = 0.1
         self.prev_dist_to_goal = self.dist_to_goal_start
 
-        # 切换目标时：保留最近 5 步历史，让 GRU 看到平滑过渡
-        # 训练时 GRU 从未见过"全相同"的 padding 序列，保留部分历史更接近训练分布
+        # Keep a few recent GRU frames so a target switch is closer to the
+        # training distribution than an all-zero history reset.
         keep_steps = min(5, len(self.state_history_buffer))
         if keep_steps > 0:
             recent_history = list(self.state_history_buffer)[-keep_steps:]
@@ -480,13 +468,11 @@ class AgentVisualEnv(RobotVisualEnv):
         else:
             self.state_history_buffer.clear()
 
-        # 记录目标切换时刻，用于渐进过渡
         self._goal_switch_step = self.current_step
         self._prev_goal_pos = getattr(self, 'goal_pos', None)
 
-        # 关键修复：重置低层运动控制器状态
-        # 否则 obs_history / last_action / velocity_smoother 残留旧导航数据
-        # 导致低层策略输出错误关节命令，机器人朝奇怪方向走
+        # Reset low-level controller state so old actions and smoothers do not
+        # bleed into the next navigation target.
         if hasattr(self, 'locomotion_controller'):
             self.locomotion_controller.reset()
 
@@ -1182,7 +1168,7 @@ class AgentVisualEnv(RobotVisualEnv):
                 aspect = box_w / max(box_h, 1)
                 if aspect > aspect_max or aspect < aspect_min:
                     continue
-                # 只有非常扁、贴底的大块才按地面误检过滤；近距离地标允许占据大画面。
+                # Filter only low, flat blobs; close landmarks can legitimately fill the frame.
                 if y1 > rgb.shape[0] * 0.985 and aspect > 1.8 and box_h < rgb.shape[0] * 0.35:
                     continue
                 if best is None or area > best["area"]:
@@ -1219,7 +1205,7 @@ class AgentVisualEnv(RobotVisualEnv):
                 continue
             world_samples = np.asarray(world_samples)
             z_values = world_samples[:, 2]
-            # 只接受离地一定高度的竖直物体；地面蓝色误检的反投影高度会接近 0。
+            # Reject floor-colored false positives by checking reconstructed height.
             min_z = 0.16 if landmark_id == "landmark_blue" else 0.18
             max_z = 1.45 if landmark_id == "landmark_blue" else 1.35
             max_z_span = 0.95 if landmark_id == "landmark_blue" else 0.90
@@ -1724,9 +1710,6 @@ class AgentVisualEnv(RobotVisualEnv):
             self._fast_dashboard_ready = False
         super().close()
 
-    # ==============================================================================
-    # 局部裁剪观测状态提取（防止维数崩溃）
-    # ==============================================================================
     def _get_obs(self):
         base_obs = super()._get_obs()
         if isinstance(base_obs, dict) and "state_history" in base_obs:
