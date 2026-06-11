@@ -1,0 +1,690 @@
+<mujoco model="Linnxil_fifteen_angle">
+    <compiler angle="radian" meshdir="../meshes/" eulerseq="xyz" />
+    <option timestep="0.001" iterations="64" solver="CG" gravity="0 0 -9.81">
+        <flag sensor="enable" frictionloss="enable" />
+    </option>
+    <size njmax="1000" nconmax="200" />
+    <visual>
+        <global offwidth="1440" offheight="810" />
+        <quality shadowsize="4096" />
+        <map znear="0.01" zfar="50.0" />
+    </visual>
+    <default>
+        <joint limited="true" />
+        <motor ctrllimited="true" />
+        <geom condim="4" contype="1" conaffinity="15" solref="0.001 2" friction="0.9 0.2 0.2" />
+        <equality solref="0.001 2" />
+        <default class="visualgeom">
+            <geom material="visualgeom" condim="1" contype="0" conaffinity="0" />
+        </default>
+        <default class="visualgeom2">
+            <geom material="visualgeom2" condim="1" contype="0" conaffinity="0" />
+        </default>
+        <default class="obstacle">
+            <geom material="obstacle" condim="3" contype="1" conaffinity="15" />
+        </default>
+        <default class="leg_joint_param">
+            <joint type="hinge" damping="0.0" frictionloss="0.005" armature="0.01" />
+        </default>
+    </default>
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512" />
+        <texture name="texplane" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 0.15 0.2" width="512" height="512" mark="cross" markrgb=".8 .8 .8" />
+        <texture name="texplane2" type="2d" builtin="checker" rgb1="1 0.3137 0.1843" rgb2="0.0 0.30196 0.38039" width="512" height="512" mark="cross" markrgb=".8 .8 .8" />
+        <material name="matplane" reflectance="0." texture="texplane" texrepeat="1 1" texuniform="true" />
+        <material name="matplane2" reflectance="0.1" texture="texplane2" texrepeat="1 1" texuniform="true" />
+        <material name="obstacle" rgba="0.9 0.6 0.2 1" />
+        <material name="visualgeom" rgba="0.5 0.9 0.2 1" />
+        <material name="visualgeom2" rgba="0.5 0.9 0.2 1" />
+        <material name="furniture_wood" rgba="0.83 0.65 0.42 1" />
+        <mesh name="base_link" file="base_link.STL" />
+        <mesh name="furniture_chair_kenney" file="furniture_chair_kenney.obj" scale="0.22 0.22 0.22" />
+        <mesh name="L_Link1" file="L_Link1.STL" />
+        <mesh name="L_Link2" file="L_Link2.STL" />
+        <mesh name="L_Link3" file="L_Link3.STL" />
+        <mesh name="L_Link3_1" file="L_Link3_1.STL" />
+        <mesh name="L_Link4_1" file="L_Link4_1.STL" />
+        <mesh name="L_Link4" file="L_Link4.STL" />
+        <mesh name="L_Link5" file="L_Link5.STL" />
+        <mesh name="L_Link6" file="L_Link6.STL" />
+        <mesh name="R_Link1" file="R_Link1.STL" />
+        <mesh name="R_Link2" file="R_Link2.STL" />
+        <mesh name="R_Link3" file="R_Link3.STL" />
+        <mesh name="R_Link3_1" file="R_Link3_1.STL" />
+        <mesh name="R_Link4_1" file="R_Link4_1.STL" />
+        <mesh name="R_Link4" file="R_Link4.STL" />
+        <mesh name="R_Link5" file="R_Link5.STL" />
+        <mesh name="R_Link6" file="R_Link6.STL" />
+        <hfield name="hf0" nrow="240" ncol="240" size="10 5 0.2 .1" />
+    </asset>
+    <worldbody>
+        <light directional="true" diffuse=".4 .4 .4" specular="0.1 0.1 0.1" pos="0 0 5.0" dir="0 0 -1" castshadow="false" />
+        <light directional="true" diffuse=".6 .6 .6" specular="0.2 0.2 0.2" pos="0 0 4" dir="0 0 -1" />
+        <geom name="ground" type="plane" size="0 0 1" pos="0.001 0 0" quat="1 0 0 0" material="matplane" condim="1" conaffinity="15" />
+        <body name="dynamic_obstacle" mocap="true" pos="-4.0 3.0 0.5">
+            <geom name="dynamic_obstacle_geom" type="cylinder" size="0.2 0.5" rgba="1 0.2 0.2 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="landmark_red_body" mocap="true" pos="5.0 5.0 0.5">
+            <geom name="landmark_red_geom" type="cylinder" size="0.3 0.5" rgba="1 0 0 0.8" contype="0" conaffinity="0" group="2" />
+        </body>
+        <body name="landmark_blue_body" mocap="true" pos="-5.0 5.0 0.5">
+            <geom name="landmark_blue_geom" type="cylinder" size="0.3 0.5" rgba="1 0 0.85 1" contype="0" conaffinity="0" group="2" />
+        </body>
+        <body name="landmark_green_body" mocap="true" pos="-5.0 -5.0 0.5">
+            <geom name="landmark_green_geom" type="cylinder" size="0.3 0.5" rgba="0 1 0 0.8" contype="0" conaffinity="0" group="2" />
+        </body>
+        <body name="landmark_yellow_body" mocap="true" pos="5.0 -5.0 0.5">
+            <geom name="landmark_yellow_geom" type="cylinder" size="0.3 0.5" rgba="1 1 0 0.8" contype="0" conaffinity="0" group="2" />
+        </body>
+        <body name="furniture_chair_0" mocap="true" pos="2.2 -1.4 0" euler="0 0 0">
+            <geom name="furniture_chair_0_visual" type="mesh" mesh="furniture_chair_kenney" material="furniture_wood" pos="0.22 0.22 0" euler="1.5708 0 0" contype="0" conaffinity="0" group="2" />
+            <geom name="furniture_chair_0_collision" type="box" size="0.28 0.28 0.52" pos="0 0 0.52" rgba="0.55 0.35 0.18 0" contype="1" conaffinity="15" group="5" />
+        </body>
+        <geom name="boundary_north" type="box" size="10 0.1 1" pos="0 10 1" rgba="0.5 0.5 0.5 1" contype="1" conaffinity="15" group="1" />
+        <geom name="boundary_south" type="box" size="10 0.1 1" pos="0 -10 1" rgba="0.5 0.5 0.5 1" contype="1" conaffinity="15" group="1" />
+        <geom name="boundary_east" type="box" size="0.1 10 1" pos="10 0 1" rgba="0.5 0.5 0.5 1" contype="1" conaffinity="15" group="1" />
+        <geom name="boundary_west" type="box" size="0.1 10 1" pos="-10 0 1" rgba="0.5 0.5 0.5 1" contype="1" conaffinity="15" group="1" />
+        <body name="gen_wall_body_0" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_0" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_1" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_1" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_2" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_2" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_3" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_3" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_4" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_4" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_5" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_5" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_6" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_6" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_7" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_7" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_8" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_8" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_9" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_9" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_10" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_10" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_11" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_11" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_12" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_12" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_13" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_13" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_14" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_14" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_15" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_15" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_16" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_16" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_17" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_17" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_18" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_18" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_19" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_19" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_20" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_20" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_21" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_21" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_22" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_22" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_23" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_23" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_24" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_24" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_25" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_25" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_26" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_26" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_27" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_27" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_28" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_28" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_29" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_29" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_30" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_30" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_31" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_31" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_32" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_32" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_33" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_33" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_34" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_34" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_35" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_35" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_36" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_36" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_37" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_37" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_38" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_38" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_39" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_39" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_40" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_40" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_41" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_41" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_42" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_42" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_43" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_43" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_44" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_44" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_45" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_45" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_46" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_46" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_47" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_47" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_48" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_48" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_49" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_49" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_50" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_50" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_51" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_51" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_52" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_52" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_53" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_53" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_54" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_54" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_55" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_55" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_56" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_56" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_57" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_57" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_58" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_58" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_59" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_59" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_60" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_60" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_61" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_61" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_62" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_62" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_63" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_63" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_64" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_64" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_65" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_65" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_66" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_66" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_67" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_67" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_68" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_68" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_69" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_69" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_70" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_70" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_71" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_71" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_72" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_72" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_73" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_73" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_74" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_74" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_75" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_75" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_76" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_76" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_77" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_77" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_78" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_78" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_79" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_79" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_80" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_80" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_81" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_81" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_82" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_82" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_83" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_83" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_84" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_84" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_85" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_85" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_86" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_86" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_87" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_87" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_88" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_88" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_89" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_89" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_90" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_90" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_91" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_91" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_92" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_92" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_93" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_93" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_94" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_94" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_95" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_95" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_96" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_96" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_97" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_97" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_98" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_98" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_99" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_99" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_100" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_100" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_101" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_101" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_102" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_102" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_103" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_103" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_104" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_104" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_105" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_105" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_106" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_106" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_107" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_107" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_108" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_108" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_109" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_109" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_110" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_110" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_111" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_111" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_112" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_112" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_113" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_113" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_114" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_114" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_115" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_115" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_116" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_116" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_117" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_117" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_118" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_118" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="gen_wall_body_119" mocap="true" pos="0 0 -10">
+            <geom name="gen_wall_119" type="box" size="1.3 0.1 1" rgba="0.8 0.7 0.6 1" contype="1" conaffinity="15" group="1" />
+        </body>
+        <body name="base_link" pos="0.0 0.0 1.03">
+            <geom type="mesh" rgba="1 1 1 1" mesh="base_link" contype="1" conaffinity="15" group="1" />
+            <inertial pos="0.033723 0.00075 0.129204" mass="15.136857" diaginertia="0.440431 0.354104 0.220259" />
+            <joint type="slide" axis="1 0 0" limited="false" />
+            <joint type="slide" axis="0 1 0" limited="false" />
+            <joint type="slide" axis="0 0 1" limited="false" />
+            <joint type="ball" limited="false" />
+            <site name="imu" size="0.01" pos="0.0 0 0.0" />
+            <geom name="camera_mount" type="box" size="0.02 0.03 0.02" pos="0.2 0 0.36" euler="3.14159 1.309 -1.5708" rgba="0.8 0.2 0.2 1" contype="0" conaffinity="0" />
+            <camera name="d435i_depth" mode="fixed" pos="0.2 0 0.36" euler="0 -1.309 -1.5708" fovy="50" />
+            <camera name="d435i_rgb" mode="fixed" pos="0.2 0 0.36" euler="0 1.5708 -1.5708" fovy="87" />
+            <body name="L_Link1_b" pos="0 0.13 0">
+                <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="L_joint1" pos="0 0 0" axis="0.965926 0 0.258819" limited="true" range="-0.26 1.57" class="leg_joint_param" />
+                <geom size="0.0005 0.0005 0.0005" type="box" contype="1" conaffinity="15" group="1" />
+                <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                <body name="L_Link1" pos="0 0 0">
+                    <inertial pos="0.00189002 -5.76198e-10 -0.00705481" quat="0.991448 0 -0.1305 0" mass="1.30056" diaginertia="0.00481166 0.004494 0.00309934" />
+                    <joint name="L_joint1_b" pos="0 0 0" axis="0.965926 0 0.258819" limited="true" range="-0.008727 0.008727" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link1" />
+                    <geom type="mesh" rgba="1 1 1 1" mesh="L_Link1" class="visualgeom" />
+                    <body name="L_Link2_b" pos="0 0 0">
+                        <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                        <joint name="L_joint2" pos="0 0 0" axis="-0.258819 0 0.965926" limited="true" range="-0.78 2.09" class="leg_joint_param" />
+                        <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                        <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                        <body name="L_Link2" pos="0 0 0">
+                            <inertial pos="0.0357907 -2.40396e-07 -0.130629" quat="0.990474 -0.0275771 -0.134505 -0.0104174" mass="3.96777" diaginertia="0.0268989 0.0178923 0.0164048" />
+                            <joint name="L_joint2_b" pos="0 0 0" axis="-0.258819 0 0.965926" limited="true" range="-0.008727 0.008727" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link2" />
+                            <geom type="mesh" rgba="1 1 1 1" mesh="L_Link2" class="visualgeom" />
+                            <body name="L_Link3_b" pos="0.044129 0 -0.16469">
+                                <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                <joint name="L_joint3" pos="0 0 0" axis="0 1 0" limited="true" range="-1.31 1.04" class="leg_joint_param" />
+                                <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                <body name="L_Link3" pos="0 0 0">
+                                    <inertial pos="0.0146164 9.11036e-05 -0.0971861" quat="0.998483 -0.00454481 0.054877 -0.000221617" mass="5.34927" diaginertia="0.0538645 0.0445487 0.0241009" />
+                                    <joint name="L_joint3_b" pos="0 0 0" axis="0 1 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link3" />
+                                    <geom type="mesh" rgba="1 1 1 1" mesh="L_Link3" />
+                                    <body name="L_Link3_1" pos="0 0 -0.1255">
+                                        <inertial pos="-0.0159757 -0.000331866 -0.0381439" quat="0.976694 0.0134264 0.119661 0.177678" mass="1.33763" diaginertia="0.00259501 0.00253617 0.00106482" />
+                                        <joint name="L_joint3_1" pos="0 0 0" axis="0 1 0" limited="true" range="-3.14 3.14" />
+                                        <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link3_1" />
+                                        <geom type="mesh" rgba="1 1 1 1" mesh="L_Link3_1" class="visualgeom" />
+                                    </body>
+                                    <body name="L_Link4_b" pos="0 0 -0.4">
+                                        <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                        <joint name="L_joint4" pos="0 0 0" axis="0 1 0" limited="true" range="0 2.09" class="leg_joint_param" />
+                                        <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                        <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                        <body name="L_Link4" pos="0 0 0">
+                                            <inertial pos="0.00408591 -0.00294548 -0.142676" quat="0.999691 0.0141482 -0.0057906 0.0195856" mass="1.42203" diaginertia="0.0270338 0.0265551 0.00221318" />
+                                            <joint name="L_joint4_b" pos="0 0 0" axis="0 1 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link4" />
+                                            <geom size="0.0395 0.0395 0.1" pos="0 0 -0.2" type="box" rgba="1 1 1 1" />
+                                            <body name="L_Link4_1" pos="-0.022939 0 -0.085613" quat="2.67949e-08 0 1 0">
+                                                <inertial pos="-5.86893e-07 5.39715e-12 -0.13725" quat="0.707107 0 0 0.707107" mass="0.164849" diaginertia="0.001655 0.001637 2.2e-05" />
+                                                <joint name="L_joint4_1" pos="0 0 0" axis="0 1 0" limited="true" range="-3.14 3.14" />
+                                                <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.898039 0.917647 0.929412 1" mesh="L_Link4_1" />
+                                                <geom type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="L_Link4_1" class="visualgeom" />
+                                            </body>
+                                            <body name="L_Link5_b" pos="0 0 -0.4">
+                                                <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                                <joint name="L_joint5" pos="0 0 0" axis="0 1 0" limited="true" range="-0.52 0.87" class="leg_joint_param" />
+                                                <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                                <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                                <body name="L_Link5" pos="0 0 0">
+                                                    <inertial pos="0.00364461 5.93311e-06 5.11912e-08" quat="0.707107 0.707107 0 0" mass="0.219798" diaginertia="0.000153 0.000135 6.9e-05" />
+                                                    <joint name="L_joint5_b" pos="0 0 0" axis="0 1 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                                    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link5" />
+                                                    <geom type="mesh" rgba="1 1 1 1" mesh="L_Link5" class="visualgeom" />
+                                                    <body name="L_Link6_b" pos="0 0 0">
+                                                        <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                                        <joint name="L_joint6" pos="0 0 0" axis="1 0 0" limited="true" range="-0.26 0.26" class="leg_joint_param" />
+                                                        <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                                        <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                                        <body name="L_Link6" pos="0 0 0">
+                                                            <inertial pos="0.0521736 1.65906e-07 -0.050262" quat="0 0.749712 0 0.661765" mass="0.741199" diaginertia="0.00305715 0.002928 0.000775846" />
+                                                            <joint name="L_joint6_b" pos="0 0 0" axis="1 0 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                                            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="L_Link6" />
+                                                            <geom type="mesh" rgba="1 1 1 1" mesh="L_Link6" />
+                                                        </body>
+                                                    </body>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="R_Link1_b" pos="0 -0.13 0">
+                <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="R_joint1" pos="0 0 0" axis="0.965926 0 0.258819" limited="true" range="-1.57 0.26" class="leg_joint_param" />
+                <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                <body name="R_Link1" pos="0 0 0">
+                    <inertial pos="0.00189001 -4.20417e-09 -0.00705479" quat="0.991448 0 -0.1305 0" mass="1.30056" diaginertia="0.00481166 0.004494 0.00309934" />
+                    <joint name="R_joint1_b" pos="0 0 0" axis="0.965926 0 0.258819" limited="true" range="-0.008727 0.008727" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link1" />
+                    <geom type="mesh" rgba="1 1 1 1" mesh="R_Link1" class="visualgeom" />
+                    <body name="R_Link2_b" pos="0 0 0">
+                        <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                        <joint name="R_joint2" pos="0 0 0" axis="-0.258819 0 0.965926" limited="true" range="-2.09 0.78" class="leg_joint_param" />
+                        <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                        <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                        <body name="R_Link2" pos="0 0 0">
+                            <inertial pos="0.035791 -2.4338e-07 -0.13063" quat="0.990474 -0.0275771 -0.134505 -0.0104174" mass="3.96777" diaginertia="0.0268989 0.0178923 0.0164048" />
+                            <joint name="R_joint2_b" pos="0 0 0" axis="-0.258819 0 0.965926" limited="true" range="-0.008727 0.008727" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link2" />
+                            <geom type="mesh" rgba="1 1 1 1" mesh="R_Link2" class="visualgeom" />
+                            <body name="R_Link3_b" pos="0.044129 0 -0.16469">
+                                <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                <joint name="R_joint3" pos="0 0 0" axis="0 1 0" limited="true" range="-1.31 1.04" class="leg_joint_param" />
+                                <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                <body name="R_Link3" pos="0 0 0">
+                                    <inertial pos="0.0146164 -9.3394e-05 -0.0971861" quat="0.99848 -0.00421982 0.0548819 0.0028592" mass="5.34927" diaginertia="0.0538647 0.0445483 0.024101" />
+                                    <joint name="R_joint3_b" pos="0 0 0" axis="0 1 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link3" />
+                                    <geom type="mesh" rgba="1 1 1 1" mesh="R_Link3" />
+                                    <body name="R_Link3_1" pos="0 0 -0.1255">
+                                        <inertial pos="-0.0159757 0.000331866 -0.0381439" quat="0.976694 -0.0134264 0.119661 -0.177678" mass="1.33763" diaginertia="0.00259501 0.00253617 0.00106482" />
+                                        <joint name="R_joint3_1" pos="0 0 0" axis="0 1 0" limited="true" range="-3.14 3.14" />
+                                        <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link3_1" />
+                                        <geom type="mesh" rgba="1 1 1 1" mesh="R_Link3_1" class="visualgeom" />
+                                    </body>
+                                    <body name="R_Link4_b" pos="0 0 -0.4">
+                                        <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                        <joint name="R_joint4" pos="0 0 0" axis="0 1 0" limited="true" range="0 2.09" class="leg_joint_param" />
+                                        <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                        <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                        <body name="R_Link4" pos="0 0 0">
+                                            <inertial pos="0.00408594 0.00293694 -0.142676" quat="0.999691 -0.0141482 -0.0057906 -0.0195856" mass="1.42203" diaginertia="0.0270338 0.0265551 0.00221318" />
+                                            <joint name="R_joint4_b" pos="0 0 0" axis="0 1 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link4" />
+                                            <geom size="0.0395 0.0395 0.1" pos="0 0 -0.2" type="box" rgba="1 1 1 1" />
+                                            <body name="R_Link4_1" pos="-0.022939 0 -0.085613" quat="2.67949e-08 0 1 0">
+                                                <inertial pos="-5.86893e-07 5.39878e-12 -0.13725" quat="0.707107 0 0 0.707107" mass="0.164849" diaginertia="0.001655 0.001637 2.2e-05" />
+                                                <joint name="R_joint4_1" pos="0 0 0" axis="0 1 0" limited="true" range="-3.14 3.14" />
+                                                <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.898039 0.917647 0.929412 1" mesh="R_Link4_1" />
+                                                <geom type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="R_Link4_1" class="visualgeom" />
+                                            </body>
+                                            <body name="R_Link5_b" pos="0 0 -0.4">
+                                                <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                                <joint name="R_joint5" pos="0 0 0" axis="0 1 0" limited="true" range="-0.52 0.87" class="leg_joint_param" />
+                                                <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                                <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                                <body name="R_Link5" pos="0 0 0">
+                                                    <inertial pos="0.00364461 -6.56145e-05 5.11901e-08" quat="0.707107 0.707107 0 0" mass="0.219798" diaginertia="0.000153 0.000135 6.9e-05" />
+                                                    <joint name="R_joint5_b" pos="0 0 0" axis="0 1 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                                    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link5" />
+                                                    <geom type="mesh" rgba="1 1 1 1" mesh="R_Link5" class="visualgeom" />
+                                                    <body name="R_Link6_b" pos="0 0 0">
+                                                        <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001" />
+                                                        <joint name="R_joint6" pos="0 0 0" axis="1 0 0" limited="true" range="-0.26 0.26" class="leg_joint_param" />
+                                                        <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" />
+                                                        <geom size="0.0005 0.0005 0.0005" type="box" class="visualgeom" />
+                                                        <body name="R_Link6" pos="0 0 0">
+                                                            <inertial pos="0.0521736 1.70668e-07 -0.050262" quat="0 0.749712 0 0.661765" mass="0.741199" diaginertia="0.00305715 0.002928 0.000775846" />
+                                                            <joint name="R_joint6_b" pos="0 0 0" axis="1 0 0" limited="true" range="-0.017453 0.017453" solreflimit="0.001 2.0" solimplimit="0.998 0.999 0.001 0.001 12" />
+                                                            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" mesh="R_Link6" />
+                                                            <geom type="mesh" rgba="1 1 1 1" mesh="R_Link6" />
+                                                        </body>
+                                                    </body>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+    <equality>
+        <connect name="c1" body1="L_Link4_1" body2="L_Link3_1" anchor="0 0 -0.2745" />
+        <connect name="c2" body1="R_Link4_1" body2="R_Link3_1" anchor="0 0 -0.2745" />
+    </equality>
+    <actuator>
+        <motor name="L_joint1" joint="L_joint1" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="L_joint2" joint="L_joint2" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="L_joint3" joint="L_joint3" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="L_joint4" joint="L_joint4" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="L_joint5" joint="L_joint5" gear="1" ctrllimited="true" ctrlrange="-40 40" />
+        <motor name="L_joint6" joint="L_joint6" gear="1" ctrllimited="true" ctrlrange="-40 40" />
+        <motor name="R_joint1" joint="R_joint1" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="R_joint2" joint="R_joint2" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="R_joint3" joint="R_joint3" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="R_joint4" joint="R_joint4" gear="1" ctrllimited="true" ctrlrange="-240 240" />
+        <motor name="R_joint5" joint="R_joint5" gear="1" ctrllimited="true" ctrlrange="-40 40" />
+        <motor name="R_joint6" joint="R_joint6" gear="1" ctrllimited="true" ctrlrange="-40 40" />
+    </actuator>
+    <sensor>
+        <actuatorpos name="L_joint1_p" actuator="L_joint1" user="13" />
+        <actuatorpos name="L_joint2_p" actuator="L_joint2" user="13" />
+        <actuatorpos name="L_joint3_p" actuator="L_joint3" user="13" />
+        <actuatorpos name="L_joint4_p" actuator="L_joint4" user="13" />
+        <actuatorpos name="L_joint5_p" actuator="L_joint5" user="13" />
+        <actuatorpos name="L_joint6_p" actuator="L_joint6" user="13" />
+        <actuatorpos name="R_joint1_p" actuator="R_joint1" user="13" />
+        <actuatorpos name="R_joint2_p" actuator="R_joint2" user="13" />
+        <actuatorpos name="R_joint3_p" actuator="R_joint3" user="13" />
+        <actuatorpos name="R_joint4_p" actuator="R_joint4" user="13" />
+        <actuatorpos name="R_joint5_p" actuator="R_joint5" user="13" />
+        <actuatorpos name="R_joint6_p" actuator="R_joint6" user="13" />
+        <actuatorpos name="L_joint1_v" actuator="L_joint1" user="13" />
+        <actuatorpos name="L_joint2_v" actuator="L_joint2" user="13" />
+        <actuatorpos name="L_joint3_v" actuator="L_joint3" user="13" />
+        <actuatorpos name="L_joint4_v" actuator="L_joint4" user="13" />
+        <actuatorpos name="L_joint5_v" actuator="L_joint5" user="13" />
+        <actuatorpos name="L_joint6_v" actuator="L_joint6" user="13" />
+        <actuatorpos name="R_joint1_v" actuator="R_joint1" user="13" />
+        <actuatorpos name="R_joint2_v" actuator="R_joint2" user="13" />
+        <actuatorpos name="R_joint3_v" actuator="R_joint3" user="13" />
+        <actuatorpos name="R_joint4_v" actuator="R_joint4" user="13" />
+        <actuatorpos name="R_joint5_v" actuator="R_joint5" user="13" />
+        <actuatorpos name="R_joint6_v" actuator="R_joint6" user="13" />
+        <actuatorpos name="L_joint1_f" actuator="L_joint1" user="13" noise="1e-2" />
+        <actuatorpos name="L_joint2_f" actuator="L_joint2" user="13" noise="1e-2" />
+        <actuatorpos name="L_joint3_f" actuator="L_joint3" user="13" noise="1e-2" />
+        <actuatorpos name="L_joint4_f" actuator="L_joint4" user="13" noise="1e-2" />
+        <actuatorpos name="L_joint5_f" actuator="L_joint5" user="13" noise="1e-2" />
+        <actuatorpos name="L_joint6_f" actuator="L_joint6" user="13" noise="1e-2" />
+        <actuatorpos name="R_joint1_f" actuator="R_joint1" user="13" noise="1e-2" />
+        <actuatorpos name="R_joint2_f" actuator="R_joint2" user="13" noise="1e-2" />
+        <actuatorpos name="R_joint3_f" actuator="R_joint3" user="13" noise="1e-2" />
+        <actuatorpos name="R_joint4_f" actuator="R_joint4" user="13" noise="1e-2" />
+        <actuatorpos name="R_joint5_f" actuator="R_joint5" user="13" noise="1e-2" />
+        <actuatorpos name="R_joint6_f" actuator="R_joint6" user="13" noise="1e-2" />
+        <framequat name="orientation" objtype="site" noise="0.001" objname="imu" />
+        <framepos name="position" objtype="site" noise="0.001" objname="imu" />
+        <gyro name="angular-velocity" site="imu" noise="0.005" cutoff="34.9" />
+        <velocimeter name="linear-velocity" site="imu" noise="0.001" cutoff="30" />
+        <accelerometer name="linear-acceleration" site="imu" noise="0.005" cutoff="157" />
+        <magnetometer name="magnetometer" site="imu" />
+    </sensor>
+</mujoco>

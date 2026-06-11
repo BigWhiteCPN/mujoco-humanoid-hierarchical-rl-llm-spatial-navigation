@@ -20,15 +20,23 @@ try:
 except ImportError:
     SegFormerSemanticSegmenter = None
 
-# Prefer the random-map training environment so dynamics and observation format
-# match the policy checkpoint used by this demo.
-sys.path.append("/home/iansten/code/IsaacLabExtensionTemplate/scripts/visual_train/")
+# Prefer the bundled random-map training environment so dynamics and observation
+# format match the policy checkpoint used by this demo.
+local_visual_train = Path(__file__).with_name("visual_train")
+if local_visual_train.exists():
+    sys.path.insert(0, str(local_visual_train))
+
+for legacy_visual_train in (
+    "/home/iansten/code/IsaacLabExtensionTemplate/scripts/visual_train/",
+    "/home/chen/code/IsaacLabExtensionTemplate/scripts/visual_train/",
+):
+    if legacy_visual_train not in sys.path:
+        sys.path.append(legacy_visual_train)
+
 try:
     from robot_visual_env_random_map import RobotVisualEnv, GlobalGridMap
 except ImportError:
-    # Local fallback path on this workstation.
-    sys.path.append("/home/chen/code/IsaacLabExtensionTemplate/scripts/visual_train/")
-    from robot_visual_env_random_map import RobotVisualEnv, GlobalGridMap
+    raise
 
 
 class MazeGridGenerator:

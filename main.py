@@ -29,6 +29,29 @@ def dashboard_log(env, message):
         env.append_dashboard_log(message)
 
 
+def load_local_env(project_root):
+    env_path = os.path.join(project_root, ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ.setdefault(key, value)
+
+
+def resolve_project_path(project_root, env_name, default_relative_path):
+    raw_path = os.environ.get(env_name, default_relative_path)
+    if os.path.isabs(raw_path):
+        return raw_path
+    return os.path.join(project_root, raw_path)
+
+
 class CommandWindow:
     def __init__(self):
         import tkinter as tk
@@ -135,14 +158,23 @@ def input_with_idle(prompt, env, realtime_runner, command_window):
 
 
 def main():
-    model_xml = os.environ.get(
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    load_local_env(project_root)
+
+    model_xml = resolve_project_path(
+        project_root,
         "ROBOT_MODEL_XML",
-        "/home/chen/code/IsaacLabExtensionTemplate/scripts/resources/mjcf/Linnxil_fifteen_angle_bs_copy_20260302_copy.xml",
+        "resources/mjcf/Linnxil_fifteen_angle_bs_copy_20260302_copy.xml",
     )
-    low_level_policy_path = os.environ.get("LOW_LEVEL_POLICY_PATH", "/home/chen/policy/policy_20251026.pt")
-    sac_model_path = os.environ.get(
+    low_level_policy_path = resolve_project_path(
+        project_root,
+        "LOW_LEVEL_POLICY_PATH",
+        "models/policy_20251026.pt",
+    )
+    sac_model_path = resolve_project_path(
+        project_root,
         "SAC_MODEL_PATH",
-        "/home/chen/code/IsaacLabExtensionTemplate/sac_lidar_logs_random/sac_lidar_interrupted_good3_0.91.zip",
+        "models/sac_lidar_interrupted_good3_0.91.zip",
     )
 
     print("=== 启动 MuJoCo 导航演示 ===")
