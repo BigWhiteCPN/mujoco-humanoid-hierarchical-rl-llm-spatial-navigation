@@ -4,9 +4,9 @@ MuJoCo-based embodied agent demo with frontier exploration, SAC navigation, lida
 
 ## Demo
 
-[![Demo video preview](assets/demo-preview.png)](assets/demo.mp4)
+[![Demo video preview](assets/demo-preview.png)](https://cdn.jsdelivr.net/gh/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation@main/assets/demo.mp4)
 
-[Watch the 2:45 demo video](assets/demo.mp4) ([WebM fallback](assets/demo.webm)).
+[Watch the 2:45 demo video](https://cdn.jsdelivr.net/gh/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation@main/assets/demo.mp4) ([WebM fallback](https://cdn.jsdelivr.net/gh/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation@main/assets/demo.webm)).
 
 ## Notes
 
