@@ -2,6 +2,7 @@ import os
 import json
 import time
 import httpx
+import logging
 import threading
 from contextlib import nullcontext
 from queue import Queue
@@ -10,22 +11,43 @@ from openai import OpenAI
 
 from skills import MentalSimulator
 
+LOGGER = logging.getLogger(__name__)
+
+
 class RobotAgent:
-    def __init__(self, nav_skill, memory, explore_skill, topo_map=None):
+    def __init__(
+        self,
+        nav_skill,
+        memory,
+        explore_skill,
+        topo_map=None,
+        llm_base_url=None,
+        llm_api_key=None,
+        llm_model=None,
+        llm_timeout_s=60.0,
+        llm_enabled=True,
+    ):
         self.nav_skill = nav_skill
         self.memory = memory
         self.explore_skill = explore_skill
         self.topo_map = topo_map
+        self.llm_enabled = llm_enabled
 
         # Use the same planner as navigation for a cheap feasibility check before running SAC.
         self.mental_simulator = MentalSimulator(self.nav_skill.env, robot_radius_m=0.4)
 
-        self.client = OpenAI(
-            base_url="https://api.siliconflow.cn/v1",
-            api_key=os.environ.get("SILICONFLOW_API_KEY"),
-            http_client=httpx.Client(trust_env=False)
-        )
-        self.model_name = "Pro/zai-org/GLM-4.7"
+        self.model_name = llm_model or os.environ.get("LLM_MODEL", "Pro/zai-org/GLM-4.7")
+        api_key = llm_api_key or os.environ.get("LLM_API_KEY") or os.environ.get("SILICONFLOW_API_KEY")
+        base_url = llm_base_url or os.environ.get("LLM_BASE_URL", "https://api.siliconflow.cn/v1")
+        self.client = None
+        if self.llm_enabled and api_key:
+            self.client = OpenAI(
+                base_url=base_url,
+                api_key=api_key,
+                http_client=httpx.Client(trust_env=False, timeout=float(llm_timeout_s)),
+            )
+        elif self.llm_enabled:
+            LOGGER.warning("LLM API key is not configured; natural-language commands will be unavailable.")
 
         self.tools =[
             {
@@ -128,7 +150,7 @@ class RobotAgent:
             else:
                 direction_hint = None
 
-            print(f"[执行] 开始定向探索: targets={targets}, direction_hint={direction_hint}")
+            LOGGER.info("Start directed exploration: targets=%s direction_hint=%s", targets, direction_hint)
 
             journey_log = self.explore_skill.execute(
                 max_rounds=20,
@@ -143,7 +165,7 @@ class RobotAgent:
                     coords = self.memory.get_location_by_meaning(t)
                     if coords:
                         landmark_id = self.memory.get_feature_id_by_meaning(t) if hasattr(self.memory, "get_feature_id_by_meaning") else None
-                        print(f"[导航] 按顺序前往: {t} ({coords[0]:.1f}, {coords[1]:.1f})")
+                        LOGGER.info("Navigate to target in order: %s (%.1f, %.1f)", t, coords[0], coords[1])
                         success, dist = self.nav_skill.go_to(
                             coords[0],
                             coords[1],
@@ -171,7 +193,7 @@ class RobotAgent:
 
         elif func_name == "navigate_to_place":
             place_name = args.get('place_name')
-            print(f"[预演] 检查前往【{place_name}】的路径")
+            LOGGER.info("Run path feasibility check for %s", place_name)
 
             coords = self.memory.get_location_by_meaning(place_name)
             if not coords:
@@ -186,13 +208,14 @@ class RobotAgent:
             )
             
             if not sim_result["feasible"]:
-                print(f"[预演] 路径不可达: {sim_result['reason']}")
+                LOGGER.info("Path feasibility check failed: %s", sim_result["reason"])
                 return (f"【路径预演失败】：物理空间阻断，无法前往 {place_name}。原因：{sim_result['reason']}。"
                         f"请向用户说明当前地图上没有可达路径。")
             
-            print(
-                f"[预演] 路径可达: length={sim_result['path_length_m']:.1f}m, "
-                f"estimated_steps={sim_result['estimated_steps']}"
+            LOGGER.info(
+                "Path feasible: length=%.1fm estimated_steps=%s",
+                sim_result["path_length_m"],
+                sim_result["estimated_steps"],
             )
             
             success, dist = self.nav_skill.go_to(
@@ -313,8 +336,10 @@ class RobotAgent:
                 env.grid_map.update_visited_footprint(robot_pos)
 
     def chat_and_execute(self, user_command):
-        print(f"\n[用户] 指令: {user_command}")
+        LOGGER.info("User command: %s", user_command)
         self._log_ui(f"用户: {user_command}")
+        if not self.llm_enabled or self.client is None:
+            return "语言模型未配置。请设置 LLM_API_KEY 或 SILICONFLOW_API_KEY，或使用保存记忆/加载记忆/回忆等本地命令。"
 
         robot_pos = self.nav_skill.env.data.xpos[self.nav_skill.env.robot_base_body_id][:2]
         spatial_report = self.memory.get_spatial_report(robot_pos)
@@ -352,7 +377,7 @@ class RobotAgent:
             {"role": "user", "content": user_command}
         ]
 
-        print("[LLM] 读取空间状态并选择工具...")
+        LOGGER.info("LLM is reading spatial state and selecting tools.")
         self._log_ui("思考提示: 读取空间记忆、未探索区域和重复访问节点，判断是否需要调用导航/探索工具。")
 
         max_tool_rounds = 5
@@ -374,7 +399,7 @@ class RobotAgent:
                 tool_call_id = tool_call.id
                 args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
 
-                print(f"[LLM] 第{tool_round + 1}轮工具调用: {func_name}({args})")
+                LOGGER.info("LLM tool call round %s: %s(%s)", tool_round + 1, func_name, args)
                 self._log_ui(f"工具调用: {func_name}({self._shorten_for_ui(args, max_chars=120)})")
 
                 tool_result = self._execute_tool_call(func_name, args)
@@ -386,7 +411,7 @@ class RobotAgent:
                     "tool_call_id": tool_call_id
                 })
 
-        print("[LLM] 工具轮次结束，生成最终回复...")
+        LOGGER.info("LLM tool rounds completed; generating final response.")
         if getattr(self.nav_skill.env, "_shutdown_requested", False):
             return "任务已被用户中断。"
         self._log_ui("LLM: 工具轮次结束，生成最终汇报...")
