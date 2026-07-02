@@ -19,6 +19,7 @@
 - 路径预演：执行导航前先用当前地图做可达性检查，避免直接把机器人推向明显不可达目标。
 - 实时交互：等待语言模型响应时，机器人仍会保持 idle locomotion、更新感知并刷新 dashboard。
 - 记忆持久化：空间记忆、拓扑地图、访问栅格和里程计日志可以保存并在后续 session 中加载。
+- Bridge 训练：`bridge_llm_and_sac/` 记录导航过程状态并训练 advisor，用于判断子目标是否继续、切换或触发重新规划。
 
 ## 系统流程
 
@@ -61,6 +62,7 @@ SpatialMemory + TopologicalMap + Qt dashboard
 ├── resources/                      # MuJoCo XML 和 mesh
 ├── models/                         # 低层运动策略和 SAC 导航策略
 ├── visual_train/                   # 与导航策略匹配的随机地图环境
+├── bridge_llm_and_sac/              # LLM-SAC bridge/advisor 数据记录、训练和评估
 ├── scripts/check_demo_assets.py    # 运行前资产检查
 └── tests/                          # 不启动 MuJoCo 的轻量测试
 ```
