@@ -6,8 +6,9 @@
 
 ### 项目定位
 
-本仓库面向 MuJoCo 人形机器人分层强化学习与 LLM 空间导航任务，提供
-LLM 高层任务规划与 SAC 导航控制之间的 bridge/advisor 训练代码。
+本模块面向 [mujoco-humanoid-hierarchical-rl-llm-spatial-navigation](https://github.com/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation)
+项目中的 MuJoCo 人形机器人分层强化学习与 LLM 空间导航任务，提供 LLM 高层任务规划与
+SAC 导航控制之间的 bridge/advisor 训练代码。
 项目负责运行状态记录、训练数据构建、advisor 训练、离线评估和在线 A/B 实验。
 
 运行系统负责真实运行时的机器人状态、导航回调、空间记忆、拓扑地图和
@@ -305,10 +306,10 @@ python -m scripts.sweep_risk_thresholds --data-dir data/runtime_merged
 
 ### Project Scope
 
-This repository contains the bridge/advisor training code for MuJoCo humanoid
-hierarchical RL and LLM spatial navigation. It covers runtime state recording,
-dataset construction, advisor training, offline evaluation and online A/B
-experiments.
+This module contains the bridge/advisor training code for the
+[mujoco-humanoid-hierarchical-rl-llm-spatial-navigation](https://github.com/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation)
+project. It covers runtime state recording, dataset construction, advisor
+training, offline evaluation and online A/B experiments.
 
 The runtime navigation system remains responsible for robot state, navigation
 callbacks, spatial memory, topological maps and SAC navigation.
