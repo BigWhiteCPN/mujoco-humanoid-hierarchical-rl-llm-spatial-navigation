@@ -1,32 +1,50 @@
-# MuJoCo Humanoid Hierarchical RL + LLM Spatial Navigation
+# Bridge Advisor for LLM-Guided MuJoCo Navigation
 
 中文 | [English](#english)
 
 ## 中文
 
-### 项目定位
+### 这是什么
 
-本模块面向 [mujoco-humanoid-hierarchical-rl-llm-spatial-navigation](https://github.com/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation)
-项目中的 MuJoCo 人形机器人分层强化学习与 LLM 空间导航任务，提供 LLM 高层任务规划与
-SAC 导航控制之间的 bridge/advisor 训练代码。
-项目负责运行状态记录、训练数据构建、advisor 训练、离线评估和在线 A/B 实验。
+这个目录是 `scripts/agent_system_complex_version` 的扩展模块，用来训练和评估
+LLM 高层规划与 SAC 导航之间的 bridge/advisor。
 
-运行系统负责真实运行时的机器人状态、导航回调、空间记忆、拓扑地图和
-SAC 导航执行。本项目只研究中间桥接层：如何在大语言模型的高层任务规划
-和 SAC 的中层/底层导航控制之间建立更高密度的信息通道。
+`agent_system_complex_version` 仍然负责机器人运行时、MuJoCo 环境、SAC `go_to`
+导航、空间记忆、拓扑地图和视觉扫描。这个模块只处理桥接层：
 
-这个 bridge 不是低层控制器。SAC 仍然执行 `go_to(x, y)` 和局部导航；
-bridge 学习的是任务执行监控和重规划触发：
+- 从运行中的 `NavigationSkill.go_to()` callback 记录地图、机器人状态、记忆和候选目标
+- 把记录保存成 `.npz` episode，供离线训练和评估使用
+- 训练 `BridgeNet` 判断当前导航段的事件、失败风险和是否需要重规划
+- 在线运行时用 advisor 给出是否提前结束当前 `go_to` 的建议
+- 跑离线 replay、阈值扫描和成对 A/B 实验
 
-- 当前导航 skill 是否应该继续
-- 机器人是否正在卡住、绕路或低收益探索
-- 视觉/语义事件是否需要触发扫描
-- 候选子目标中哪个更值得交给 SAC
-- 什么时候应该让 LLM 重新参与高层规划
+BridgeNet 不输出关节动作、速度指令，也不替代 SAC。SAC 继续执行局部导航；
+LLM 继续负责高层任务拆解。BridgeNet 读取导航过程中的状态，给出事件判断、
+风险分数和当前 `go_to` 是否值得继续的建议。
 
-### 核心想法
+### 运行时接入方式
 
-`BridgeNet-v1` 使用多模态编码和交叉注意力融合：
+在线采集和 advisor 控制通过 hook 当前 `NavigationSkill` 实例实现，不改
+`agent_system_complex_version` 的源码。
+
+hook 的位置是 `NavigationSkill.go_to(..., step_callback=..., callback_freq=...)`。
+每隔 `callback_freq` 个 env step，原本的 frontier 更新 callback 会被调用一次；
+bridge 在同一个 callback 里记录 snapshot，并在加载 checkpoint 时运行一次 advisor
+推理。如果 advisor 或 progress guard 判断应该停止，callback 返回 `True`，当前
+`go_to` 提前结束，外层 frontier/LLM 逻辑继续选择下一步。
+
+常用频率：
+
+- `collect_runtime` 默认 `callback_freq=40`
+- `collect_runtime_batch` 和 `run_ab_experiment` 默认 `callback_freq=20`
+- 当前环境中一个 env step 约为 `0.04s` 模拟时间，因此 `callback_freq=20` 约每
+  `0.8s` 推理一次
+- `sequence_len=16` 表示模型最多使用最近 16 帧 bridge 观测；不足 16 帧时用第一帧
+  padding，推理从第一帧就开始
+
+### 模型输入和输出
+
+`BridgeNet-v1` 使用地图、机器人状态、任务、空间记忆和候选目标作为输入。
 
 ```text
 map layers       -> CNN map tokens
@@ -43,39 +61,35 @@ cross-attention + transformer fusion
         -> event / replan / outcome / candidate-score heads
 ```
 
-它不是端到端控制器，而是一个导航过程监控和子目标决策模块。模型根据地图、
-机器人状态、空间记忆和候选子目标预测事件、进展、失败风险和 skill gate；
-SAC 保留快速闭环导航能力，LLM 保留高层任务拆解和语义规划能力。
+主要输出：
+
+- `event`: continue、navigation_stuck、path_invalidated、low_information_gain 等
+- `replan`: continue_current、switch_subgoal、interrupt_and_scan 等
+- `failure_risk`: 未来几个 callback 内进入失败/重规划状态的概率
+- `success/stuck/target_found/cost/info_gain`
+- `candidate_scores`: 候选目标排序分数
 
 当前运行时状态向量是 22 维：
 
-- 前 16 维：机器人位姿、目标距离、任务/进度等即时特征
-- 后 6 维：当前 `go_to` segment 的进度记忆，包括已运行 callback 数、起始距离、
-  历史最佳距离、起点到当前的进展、相对最佳点的退化、最近窗口进展
+- 前 16 维：机器人位置、朝向、目标相对位置、距离、局部进展、地图覆盖和记忆统计
+- 后 6 维：当前 `go_to` 段的进度记忆，包括 callback 数、起始距离、历史最佳距离、
+  总进展、相对最佳点的退化和最近窗口进展
 
-这 6 个 segment 记忆特征是为了补足 LLM 与 SAC 状态交流密度不足的问题，让
-bridge 能看到“这段导航是否真的在变好”。
+这 6 个 segment 特征让 advisor 能看到“这段导航是否真的在变好”，而不是只看当前一帧。
 
-### 文件结构
-
-整理后的根目录只保留项目元信息和核心包：
+### 目录结构
 
 ```text
 .
-├── bridge/              # 核心模型、数据集、recorder、advisor、hook 与 arbitration
-├── scripts/             # 数据生成、采集、训练、评估、A/B 和 smoke 命令入口
-├── tests/               # pytest smoke tests
+├── bridge/              # 模型、数据集、recorder、advisor、hook 和 arbitration
+├── scripts/             # 数据采集、训练、评估、A/B 和 smoke 命令入口
+├── tests/               # 基础 smoke tests
 ├── README.md
 ├── requirements.txt
 └── .gitignore
 ```
 
-之前根目录看起来有很多零散文件，是因为研究阶段把每个实验入口都放在根目录：
-采集、合并、训练、评估、advisor smoke、A/B 实验、阈值扫描等。现在这些命令
-统一收进 `scripts/`，仓库结构更像一个独立研究项目。
-
-`data/`、`runs/`、checkpoint、日志和 `.npz` episode 都被 `.gitignore` 排除。
-GitHub 只上传源码和文档，不上传本地训练数据或模型权重。
+`data/`、`runs/`、checkpoint、日志和 `.npz` episode 是本地实验产物，不纳入版本控制。
 
 ### 安装
 
@@ -83,7 +97,7 @@ GitHub 只上传源码和文档，不上传本地训练数据或模型权重。
 pip install -r requirements.txt
 ```
 
-如果系统 Python 没有 Torch，可以使用已有的 MuJoCo/训练环境：
+这个模块通常和已有 MuJoCo/训练环境一起使用：
 
 ```bash
 export MUJOCO_PYTHON=/path/to/mujoco_env/bin/python
@@ -91,7 +105,7 @@ export MUJOCO_PYTHON=/path/to/mujoco_env/bin/python
 
 ### 快速自检
 
-生成一个小型合成数据集：
+生成合成数据：
 
 ```bash
 python -m scripts.make_synthetic_dataset \
@@ -100,7 +114,7 @@ python -m scripts.make_synthetic_dataset \
   --steps 96
 ```
 
-训练 3 个 epoch 做 smoke test：
+训练一个短 run：
 
 ```bash
 python -m scripts.train \
@@ -109,19 +123,14 @@ python -m scripts.train \
   --batch-size 8
 ```
 
-验证 episode 格式：
+验证 episode 和模型前向：
 
 ```bash
 python -m scripts.validate_episode data/synthetic
-```
-
-前向和 loss smoke：
-
-```bash
 python -m scripts.smoke_forward
 ```
 
-如果需要用 MuJoCo Python：
+使用 MuJoCo 环境：
 
 ```bash
 $MUJOCO_PYTHON -m scripts.smoke_forward
@@ -129,7 +138,7 @@ $MUJOCO_PYTHON -m scripts.smoke_forward
 
 ### 运行时数据采集
 
-不修改外部导航运行系统核心逻辑的运行时采集：
+单次采集：
 
 ```bash
 $MUJOCO_PYTHON -m scripts.collect_runtime \
@@ -139,9 +148,6 @@ $MUJOCO_PYTHON -m scripts.collect_runtime \
   --nav-steps-per-round 800 \
   --target-place 会议室
 ```
-
-`collect_runtime` 只包装运行中的 `nav_skill.go_to` 实例，把现有
-`step_callback` 同步记录成 bridge snapshot；退出时会恢复原方法。
 
 批量采集：
 
@@ -153,7 +159,7 @@ $MUJOCO_PYTHON -m scripts.collect_runtime_batch \
   --nav-steps-per-round 400
 ```
 
-合并多个数据集：
+合并数据集：
 
 ```bash
 $MUJOCO_PYTHON -m scripts.merge_episodes \
@@ -162,7 +168,7 @@ $MUJOCO_PYTHON -m scripts.merge_episodes \
   data/runtime_v1 data/runtime_v2
 ```
 
-### 训练
+### 训练和评估
 
 从 runtime 数据训练：
 
@@ -184,7 +190,7 @@ $MUJOCO_PYTHON -m scripts.train \
   --lr 0.0001
 ```
 
-从已有 checkpoint 继续训练：
+从 checkpoint 继续训练：
 
 ```bash
 $MUJOCO_PYTHON -m scripts.train \
@@ -204,9 +210,9 @@ $MUJOCO_PYTHON -m scripts.evaluate \
   --split val
 ```
 
-### Advisor 和 A/B 实验
+### Advisor 和 A/B
 
-离线回放一个 episode：
+离线回放：
 
 ```bash
 $MUJOCO_PYTHON -m scripts.smoke_advisor \
@@ -232,9 +238,12 @@ $MUJOCO_PYTHON -m scripts.collect_runtime \
   --advisor-warmup-steps 6
 ```
 
-`--advisor-control off` 表示只观察不介入；`safe` 只允许目标/子目标完成类停止；
-`risk` 只使用失败风险类停止；`replan` 允许 stuck、低信息增益和失败风险触发
-当前 `go_to` 提前结束，让 frontier 逻辑重新选择子目标。
+控制模式：
+
+- `off`: 只记录和打印 advisor 结果，不介入导航
+- `safe`: 只允许目标/子目标完成类提前停止
+- `risk`: 只使用失败风险触发提前停止
+- `replan`: 允许 stuck、低信息增益、路径失效和失败风险触发提前停止
 
 成对 A/B 实验：
 
@@ -251,7 +260,7 @@ $MUJOCO_PYTHON -m scripts.run_ab_experiment \
 
 ### Episode 格式
 
-训练 episode 是压缩 `.npz`：
+episode 保存为压缩 `.npz`：
 
 ```text
 data/<dataset_name>/episodes/episode_000001.npz
@@ -273,17 +282,15 @@ success/stuck/target_found/cost/info_gain: [T] float32
 candidate_score_target: [T, K] float32
 ```
 
-### 当前研究结论
+### 当前实验状态
 
-现有实验表明，单纯的 learned advisor 已经能在部分场景中减少无效导航步骤和
-timeout，但解析式 progress guard 仍然能捕捉一些 learned model 漏掉的失败模式。
+已有结果里，learned advisor 能在一部分场景减少无效导航步数和 timeout；解析式
+progress guard 仍然能捕捉一些 learned model 漏掉的失败段。当前比较稳的线上方案是：
 
-当前更稳妥的方向：
-
-- 保留 hybrid control 作为安全 fallback
-- 继续把 risk-head advisor 作为主要学习型中间层方向
-- 增加 guard-triggered 和 non-triggered segment 数据，校准失败风险阈值
-- 逐步用 learned risk 替换手写 progress reflex
+- 保留 hybrid control 作为 fallback
+- 继续把 risk-head advisor 作为学习型 bridge 的主线
+- 增加 guard-triggered 和 non-triggered segment 数据
+- 先校准 failure-risk 阈值，再逐步减少手写 progress reflex 的权重
 
 ### 开发命令
 
@@ -297,38 +304,65 @@ pytest
 ```bash
 python -m scripts.summarize_episodes data/runtime_merged
 python -m scripts.audit_splits --data-dir data/runtime_merged --seed-start 1 --seed-end 30
-python -m scripts.sweep_risk_thresholds --data-dir data/runtime_merged
+python -m scripts.sweep_risk_thresholds --checkpoint runs/runtime_bridge_v1/best.pt --data-dir data/runtime_merged
 ```
 
 ---
 
 ## English
 
-### Project Scope
+### What This Is
 
-This module contains the bridge/advisor training code for the
-[mujoco-humanoid-hierarchical-rl-llm-spatial-navigation](https://github.com/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation)
-project. It covers runtime state recording, dataset construction, advisor
-training, offline evaluation and online A/B experiments.
+This directory is an extension module for `scripts/agent_system_complex_version`.
+It trains and evaluates a bridge/advisor between high-level LLM planning and
+SAC navigation.
 
-The runtime navigation system remains responsible for robot state, navigation
-callbacks, spatial memory, topological maps and SAC navigation.
-This project focuses only on the middle bridge layer: building a denser
-information channel between high-level LLM task planning and SAC-based
-navigation execution.
+`agent_system_complex_version` remains responsible for the MuJoCo runtime, SAC
+`go_to` navigation, spatial memory, topological maps and visual scanning. This
+module handles only the bridge layer:
 
-The bridge is not a low-level controller. SAC still executes `go_to(x, y)` and
-local navigation. The bridge learns task-level monitoring and replanning gates:
+- recording maps, robot state, memory and candidate goals from the running
+  `NavigationSkill.go_to()` callback
+- saving runtime traces as `.npz` episodes for offline training and evaluation
+- training `BridgeNet` to classify navigation events, estimate failure risk and
+  suggest replanning
+- using an online advisor to decide whether the current `go_to` segment should
+  end early
+- running offline replay, threshold sweeps and paired A/B experiments
 
-- whether the current navigation skill should continue
-- whether navigation is stuck, regressing or low-value
-- whether a visual/semantic event should trigger scanning
-- which candidate subgoal should be passed to SAC
-- when the LLM should be asked for high-level replanning
+BridgeNet does not output joint actions or velocity commands, and it does not
+replace SAC. SAC still handles local navigation, and the LLM still handles
+high-level task decomposition. BridgeNet reads the navigation state and returns
+event predictions, risk scores and a recommendation about whether the current
+`go_to` segment should continue.
 
-### Core Idea
+### Runtime Integration
 
-`BridgeNet-v1` uses modality-specific encoders and cross-attention fusion:
+Online collection and advisor control are installed by wrapping the current
+`NavigationSkill` instance. The robot runtime source code is not modified.
+
+The integration point is `NavigationSkill.go_to(..., step_callback=...,
+callback_freq=...)`. Every `callback_freq` environment steps, the existing
+frontier-update callback is called. The bridge records a snapshot at the same
+point and, when a checkpoint is loaded, runs one advisor inference. If the
+advisor or progress guard decides to stop, the callback returns `True`; the
+current `go_to` exits early and the outer frontier/LLM logic chooses the next
+action.
+
+Common timing:
+
+- `collect_runtime` defaults to `callback_freq=40`
+- `collect_runtime_batch` and `run_ab_experiment` default to `callback_freq=20`
+- one environment step is about `0.04s` of simulated time in the current setup,
+  so `callback_freq=20` gives one advisor inference about every `0.8s`
+- `sequence_len=16` means the model uses up to the latest 16 bridge frames; if
+  fewer frames are available, the first frame is padded, so inference starts on
+  the first observed frame
+
+### Model Inputs and Outputs
+
+`BridgeNet-v1` consumes map layers, robot state, task ids, spatial memory and
+candidate goals.
 
 ```text
 map layers       -> CNN map tokens
@@ -345,40 +379,40 @@ cross-attention + transformer fusion
         -> event / replan / outcome / candidate-score heads
 ```
 
-The design is not an end-to-end controller. It is a navigation monitoring and
-subgoal decision module. Given maps, robot state, spatial memory and candidate
-subgoals, the model predicts events, progress, failure risk and skill gates.
-SAC keeps fast closed-loop navigation, while the LLM keeps high-level task
-decomposition and semantic planning.
+Main outputs:
+
+- `event`: continue, navigation_stuck, path_invalidated, low_information_gain, ...
+- `replan`: continue_current, switch_subgoal, interrupt_and_scan, ...
+- `failure_risk`: probability of entering a failure/replan state within the next
+  few callbacks
+- `success/stuck/target_found/cost/info_gain`
+- `candidate_scores`: ranking scores for candidate goals
 
 The current runtime state vector is 22-D:
 
-- first 16 dimensions: instantaneous pose, task and progress features
-- last 6 dimensions: active `go_to` segment memory, including elapsed callbacks,
-  start distance, best distance, progress from start, regret from best distance
-  and recent-window progress
+- first 16 dimensions: robot pose, relative target, distance, local progress,
+  map coverage and memory statistics
+- last 6 dimensions: active `go_to` segment memory, including callback count,
+  start distance, best distance, total progress, regret from best distance and
+  recent-window progress
 
-These segment-memory features address the sparse communication problem between
-LLM-level planning and SAC-level execution.
+The segment features let the advisor see whether the current navigation segment
+is improving over time instead of judging only from a single frame.
 
-### Repository Layout
+### Layout
 
 ```text
 .
-├── bridge/              # Core model, dataset, recorder, advisor, hooks, arbitration
-├── scripts/             # CLI tools for data, training, evaluation, smoke tests and A/B
-├── tests/               # pytest smoke tests
+├── bridge/              # Model, dataset, recorder, advisor, hooks, arbitration
+├── scripts/             # Collection, training, evaluation, A/B and smoke CLIs
+├── tests/               # Basic smoke tests
 ├── README.md
 ├── requirements.txt
 └── .gitignore
 ```
 
-The project originally had many root-level scripts because each experiment had
-its own command entry point. They are now grouped under `scripts/` so the root
-stays focused on package code and project metadata.
-
-`data/`, `runs/`, checkpoints, logs and `.npz` episodes are ignored by Git.
-Only source code and documentation are uploaded.
+`data/`, `runs/`, checkpoints, logs and `.npz` episodes are local experiment
+outputs and are not tracked by Git.
 
 ### Installation
 
@@ -386,13 +420,13 @@ Only source code and documentation are uploaded.
 pip install -r requirements.txt
 ```
 
-If the system Python does not include Torch, use the MuJoCo/training Python:
+The module is usually run with the existing MuJoCo/training Python:
 
 ```bash
 export MUJOCO_PYTHON=/path/to/mujoco_env/bin/python
 ```
 
-### Quick Smoke Test
+### Quick Check
 
 ```bash
 python -m scripts.make_synthetic_dataset \
@@ -417,8 +451,7 @@ $MUJOCO_PYTHON -m scripts.smoke_forward
 
 ### Runtime Collection
 
-Collect runtime bridge episodes without modifying the external navigation
-runtime:
+Single run:
 
 ```bash
 $MUJOCO_PYTHON -m scripts.collect_runtime \
@@ -428,10 +461,6 @@ $MUJOCO_PYTHON -m scripts.collect_runtime \
   --nav-steps-per-round 800 \
   --target-place 会议室
 ```
-
-`collect_runtime` wraps only the live `nav_skill.go_to` instance and records
-bridge snapshots through the existing callback path. The method is restored
-when the run exits.
 
 Batch collection:
 
@@ -452,7 +481,7 @@ $MUJOCO_PYTHON -m scripts.merge_episodes \
   data/runtime_v1 data/runtime_v2
 ```
 
-### Training
+### Training and Evaluation
 
 ```bash
 $MUJOCO_PYTHON -m scripts.train \
@@ -503,7 +532,7 @@ $MUJOCO_PYTHON -m scripts.smoke_advisor \
   --device cpu
 ```
 
-Online advisor control during runtime collection:
+Online advisor control:
 
 ```bash
 $MUJOCO_PYTHON -m scripts.collect_runtime \
@@ -519,6 +548,13 @@ $MUJOCO_PYTHON -m scripts.collect_runtime \
   --advisor-stop-consecutive 2 \
   --advisor-warmup-steps 6
 ```
+
+Control modes:
+
+- `off`: record and print advisor outputs without changing navigation
+- `safe`: only stop for target/subgoal completion
+- `risk`: stop only on failure-risk triggers
+- `replan`: stop on stuck, low information gain, invalid path or high failure risk
 
 Paired A/B experiment:
 
@@ -557,18 +593,19 @@ success/stuck/target_found/cost/info_gain: [T] float32
 candidate_score_target: [T, K] float32
 ```
 
-### Current Research Takeaway
+### Current Status
 
-The learned advisor can already reduce some invalid navigation steps and
-timeouts. The analytic progress guard is still useful because it catches failure
-modes missed by the learned model.
+Current experiments show that the learned advisor can reduce invalid navigation
+steps and timeouts in some scenarios. The analytic progress guard is still a
+useful fallback because it catches failure segments missed by the learned model.
 
-Near-term direction:
+Near-term work:
 
-- keep hybrid control as the robust fallback
-- continue treating the risk-head advisor as the main learned bridge direction
-- collect more guard-triggered and non-triggered segments
-- calibrate risk thresholds before replacing the analytic reflex
+- keep hybrid control as the robust online setting
+- continue using the risk-head advisor as the main learned bridge
+- collect more guard-triggered and non-triggered segment data
+- calibrate failure-risk thresholds before reducing the hand-written progress
+  reflex
 
 ### Development
 
@@ -582,5 +619,5 @@ Useful dataset checks:
 ```bash
 python -m scripts.summarize_episodes data/runtime_merged
 python -m scripts.audit_splits --data-dir data/runtime_merged --seed-start 1 --seed-end 30
-python -m scripts.sweep_risk_thresholds --data-dir data/runtime_merged
+python -m scripts.sweep_risk_thresholds --checkpoint runs/runtime_bridge_v1/best.pt --data-dir data/runtime_merged
 ```
