@@ -10,7 +10,7 @@
 
 [观看 2 分 45 秒演示视频](https://cdn.jsdelivr.net/gh/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation@main/assets/demo.mp4)（[WebM 备用链接](https://cdn.jsdelivr.net/gh/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation@main/assets/demo.webm)）。
 
-[观看第二个演示视频：100×100m、4m 迷宫密度、正上方跟随与记忆叠加](https://cdn.jsdelivr.net/gh/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation@main/assets/demo-100m-4m-unbounded.mp4)。
+[观看第二个演示视频：100×100m、4m 迷宫密度、正上方跟随与记忆叠加](https://github.com/BigWhiteCPN/mujoco-humanoid-hierarchical-rl-llm-spatial-navigation/raw/refs/heads/main/assets/demo-100m-4m-unbounded.mp4)。
 
 ## 技术要点
 
